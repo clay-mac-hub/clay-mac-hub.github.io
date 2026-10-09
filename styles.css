@@ -12,6 +12,7 @@
   --text-dim: #6e6e73;    /* secondary text */
   --accent: #0a84ff;      /* buttons and highlights (iPhone blue) */
   --live: #ff3b30;        /* "LIVE" badge red */
+  --win: #34c759;         /* "W" green */
   --separator: rgba(60, 60, 67, 0.29);   /* thin lines between rows */
   --bar: rgba(249, 249, 249, 0.9);       /* tab bar background */
 }
@@ -215,11 +216,58 @@ body {
 .stack { display: flex; flex-direction: column; gap: 12px; }
 
 .team-card {
+  border-left: 5px solid var(--team-color);   /* team-colored stripe */
+}
+
+.team-head {
   display: flex;
   align-items: center;
   gap: 14px;
-  border-left: 5px solid var(--team-color);   /* team-colored stripe */
 }
+
+/* The live / last / next lines under the team name */
+.games {
+  margin-top: 12px;
+  border-top: 0.5px solid var(--separator);
+}
+
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  font-size: 15px;
+}
+
+/* Keep "@ ARI", scores, etc. on one line; only the date/time side may wrap */
+.game-row > span { white-space: nowrap; }
+.game-row > .right { white-space: normal; text-align: right; font-size: 14px; }
+
+/* Small label at the start of each line: LIVE / LAST / NEXT */
+.badge {
+  flex: none;
+  width: 42px;
+  padding: 2px 0;
+  border-radius: 5px;
+  background: var(--separator);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+.badge.live { background: var(--live); color: #fff; }
+
+/* Scores use same-width digits so they line up neatly */
+.score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.result { font-weight: 700; }
+.result-W { color: var(--win); }
+.result-L { color: var(--live); }
+.result-D { color: var(--text-dim); }
 
 .card {
   background: var(--card);
