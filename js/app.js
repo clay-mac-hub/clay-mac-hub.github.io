@@ -7,13 +7,16 @@ import { homeScreen } from "./views/home.js";
 import { scoresScreen } from "./views/scores.js";
 import { leaguesScreen } from "./views/leagues.js";
 import { settingsScreen } from "./views/settings.js";
+import { favoritesScreen } from "./views/favorites.js";
 
-// A lookup table: tab name -> the screen's title and the function that draws it
+// A lookup table: screen name -> its title and the function that draws it.
+// "favorites" isn't a tab; you reach it from Home or Settings.
 const screens = {
-  home:     { title: "My Teams", draw: homeScreen },
-  scores:   { title: "Scores",   draw: scoresScreen },
-  leagues:  { title: "Leagues",  draw: leaguesScreen },
-  settings: { title: "Settings", draw: settingsScreen },
+  home:      { title: "My Teams",       draw: homeScreen },
+  scores:    { title: "Scores",         draw: scoresScreen },
+  leagues:   { title: "Leagues",        draw: leaguesScreen },
+  settings:  { title: "Settings",       draw: settingsScreen },
+  favorites: { title: "Favorite Teams", draw: favoritesScreen },
 };
 
 function showCurrentTab() {
