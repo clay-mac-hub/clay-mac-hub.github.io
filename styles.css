@@ -1,0 +1,122 @@
+/*
+  styles.css — how the app looks.
+  Colors are defined once as "variables" (the --names below) so we can
+  switch everything to dark mode in one place.
+*/
+
+/* Light mode colors */
+:root {
+  --bg: #f2f2f7;          /* page background (iPhone light gray) */
+  --card: #ffffff;        /* cards and panels */
+  --text: #1c1c1e;        /* main text */
+  --text-dim: #6e6e73;    /* secondary text */
+  --accent: #0a84ff;      /* buttons and highlights (iPhone blue) */
+  --live: #ff3b30;        /* "LIVE" badge red */
+  --separator: rgba(60, 60, 67, 0.29);   /* thin lines between rows */
+  --bar: rgba(249, 249, 249, 0.9);       /* tab bar background */
+}
+
+/* Dark mode colors — used automatically when the iPhone is in dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --card: #1c1c1e;
+    --text: #f5f5f7;
+    --text-dim: #98989d;
+    --separator: rgba(84, 84, 88, 0.6);
+    --bar: rgba(22, 22, 24, 0.9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  /* -apple-system = the same font iPhone apps use */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Title bar. The "safe-area" bit keeps it below the iPhone's Dynamic Island. */
+.top-bar {
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 8px;
+}
+
+.top-bar h1 {
+  margin: 0;
+  font-size: 34px;   /* iPhone "large title" size */
+  font-weight: 700;
+}
+
+/* Extra space at the bottom so content never hides behind the tab bar */
+#screen {
+  padding: 8px 16px calc(env(safe-area-inset-bottom) + 100px);
+}
+
+/* ---------- Tab bar (bottom) ---------- */
+
+.tab-bar {
+  position: fixed;              /* stays put while the page scrolls */
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  padding: 6px 0 calc(env(safe-area-inset-bottom) + 6px);
+  background: var(--bar);
+  backdrop-filter: blur(20px);  /* frosted-glass look, like iPhone apps */
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--separator);
+}
+
+.tab-bar a {
+  flex: 1;                      /* four tabs share the width equally */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-bar svg {
+  width: 26px; height: 26px;
+  fill: none;
+  stroke: currentColor;         /* icon uses the same color as the label */
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tab-bar a.active { color: var(--accent); }
+
+/* ---------- Lists (iPhone "Settings"-style rows) ---------- */
+
+.list {
+  list-style: none;
+  margin: 0; padding: 0;
+  background: var(--card);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.list li {
+  display: flex;
+  padding: 14px 16px;
+  font-size: 17px;
+  border-bottom: 0.5px solid var(--separator);
+}
+
+.list li:last-child { border-bottom: none; }
+
+.right { margin-left: auto; }
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.dim { color: var(--text-dim); }
