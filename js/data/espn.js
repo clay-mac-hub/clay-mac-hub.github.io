@@ -100,6 +100,12 @@ export function fetchScoreboard(league, date = null) {
   return promise;
 }
 
+// Forget saved scoreboards, so the next request gets brand-new scores.
+// Called when you refresh.
+export function clearScoreCache() {
+  for (const url in scoreboardCache) delete scoreboardCache[url];
+}
+
 // ESPN wants dates written like 20261011 (year, month, day)
 function espnDate(date) {
   const two = n => String(n).padStart(2, "0");

@@ -1,7 +1,6 @@
 // settings.js — the "Settings" screen.
-// Later: choose how often scores refresh.
 
-import { getFavorites } from "../store.js";
+import { getFavorites, autoRefreshOn, setAutoRefresh } from "../store.js";
 
 export function settingsScreen(screen) {
   const count = getFavorites().length;
@@ -10,8 +9,17 @@ export function settingsScreen(screen) {
     <ul class="list">
       <li><a class="row-link" href="#favorites">Favorite teams
         <span class="dim right">${count} ›</span></a></li>
-      <li>Auto-refresh</li>
+      <li>
+        <label for="auto-refresh">Auto-refresh during games</label>
+        <input type="checkbox" class="switch" id="auto-refresh" ${autoRefreshOn() ? "checked" : ""}>
+      </li>
       <li>Data source <span class="dim right">ESPN</span></li>
     </ul>
+    <p class="dim note">When on, scores update every 30 seconds while a game is live
+    and the app is open. You can always pull down on any screen to refresh.</p>
   `;
+
+  document.getElementById("auto-refresh").addEventListener("change", event => {
+    setAutoRefresh(event.target.checked);
+  });
 }

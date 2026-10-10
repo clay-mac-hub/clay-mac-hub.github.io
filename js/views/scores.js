@@ -5,7 +5,7 @@
 import { LEAGUES } from "../data/leagues.js";
 import { fetchScoreboard, smallLogo } from "../data/espn.js";
 import { getFavorites } from "../store.js";
-import { stillOn } from "../ui.js";
+import { stillOn, isRefreshing, markUpdated, wireShowAll, rememberExpanded } from "../ui.js";
 
 // How many days before/after today the date row offers
 const DAYS_BACK = 7;
@@ -19,21 +19,27 @@ const GAME_LEAGUES = LEAGUES.filter(league => league.hasTeams);
 
 export async function scoresScreen(screen) {
   const here = location.hash;
-  screen.innerHTML = `
-    <div class="chips dates">${dateChips()}</div>
-    <div id="games"><div class="card dim">Loading games…</div></div>
-  `;
 
-  // Slide the date row so the chosen day is visible
-  screen.querySelector(".chip.selected")
-    .scrollIntoView({ inline: "center", block: "nearest" });
+  // When refreshing, keep the current games on screen until new ones arrive.
+  // Otherwise draw the date row and a "Loading" note.
+  const keepShowing = isRefreshing() && document.getElementById("games");
+  if (!keepShowing) {
+    screen.innerHTML = `
+      <div class="chips dates">${dateChips()}</div>
+      <div id="games"><div class="card dim">Loading games…</div></div>
+    `;
 
-  // Tapping a date: remember it and redraw
-  for (const chip of screen.querySelectorAll(".chip")) {
-    chip.addEventListener("click", () => {
-      selected = new Date(Number(chip.dataset.day));
-      scoresScreen(screen);
-    });
+    // Slide the date row so the chosen day is visible
+    screen.querySelector(".chip.selected")
+      .scrollIntoView({ inline: "center", block: "nearest" });
+
+    // Tapping a date: remember it and redraw
+    for (const chip of screen.querySelectorAll(".chip")) {
+      chip.addEventListener("click", () => {
+        selected = new Date(Number(chip.dataset.day));
+        scoresScreen(screen);
+      });
+    }
   }
 
   // Download every league's games for that day at the same time.
@@ -43,15 +49,12 @@ export async function scoresScreen(screen) {
     GAME_LEAGUES.map(league => fetchScoreboard(league, day)));
   if (!stillOn(here) || day !== selected) return;   // moved on while waiting
 
-  document.getElementById("games").innerHTML = gamesList(results);
-
-  // "Show all" buttons reveal hidden college games
-  for (const button of screen.querySelectorAll(".show-all")) {
-    button.addEventListener("click", () => {
-      button.closest(".section").classList.add("expanded");
-      button.remove();
-    });
-  }
+  const gamesArea = document.getElementById("games");
+  const reopenLists = rememberExpanded(gamesArea);
+  gamesArea.innerHTML = gamesList(results);
+  reopenLists();
+  wireShowAll(gamesArea);   // "Show all" reveals hidden college games
+  markUpdated();
 }
 
 // ---------- Date row ----------
@@ -180,8 +183,10 @@ function gameCard(league, game, isFav, extraClass = "", showLeague = false) {
     status = `<span class="dim">${game.detail}</span>`;
   }
 
+  // data-starts tells auto-refresh when a not-yet-started game begins
   return `
-    <li class="score-card ${extraClass}">
+    <li class="score-card ${extraClass}"
+        ${game.state === "pre" ? `data-starts="${game.date.getTime()}"` : ""}>
       <div class="teams">
         ${teamLine(game.away)}
         ${teamLine(game.home)}

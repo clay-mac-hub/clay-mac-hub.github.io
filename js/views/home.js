@@ -5,6 +5,7 @@ import { getFavorites } from "../store.js";
 import { getLeague } from "../data/leagues.js";
 import { smallLogo, fetchTeamSummary } from "../data/espn.js";
 import { gameTime, fromTeamView } from "../format.js";
+import { markUpdated, stillOn } from "../ui.js";
 
 // The last info downloaded for each team, so coming back to Home shows it
 // instantly while fresh info loads in the background.
@@ -39,16 +40,22 @@ export function homeScreen(screen) {
   `;
 
   // ...then fetch fresh info for each team and redraw its card when it arrives
-  for (const team of favorites) {
+  const here = location.hash;
+  const loads = favorites.map(team => {
     const key = `${team.league}-${team.id}`;
-    fetchTeamSummary(getLeague(team.league), team.id)
+    return fetchTeamSummary(getLeague(team.league), team.id)
       .then(summary => saved.set(key, summary))
       .catch(() => saved.set(key, saved.get(key) ?? "error"))
       .finally(() => {
         const card = document.getElementById(`card-${key}`);
         if (card) card.innerHTML = cardContent(team);   // only if still on screen
       });
-  }
+  });
+
+  // Once every card has its info, show "Updated 8:02 PM"
+  return Promise.allSettled(loads).then(() => {
+    if (stillOn(here)) markUpdated();
+  });
 }
 
 // The inside of one team's card
@@ -128,8 +135,9 @@ function lastRow(game, teamId) {
 function nextRow(game, teamId) {
   const { prefix, opponent } = fromTeamView(game, teamId);
   const when = [gameTime(game), game.broadcast].filter(Boolean).join(" · ");
+  // data-starts tells auto-refresh when this game begins
   return `
-    <div class="game-row">
+    <div class="game-row" data-starts="${game.date.getTime()}">
       <span class="badge">NEXT</span>
       <span>${prefix} ${opponent.abbr}</span>
       <span class="dim right">${when}</span>

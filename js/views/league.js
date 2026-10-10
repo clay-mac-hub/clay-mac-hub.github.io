@@ -4,7 +4,7 @@
 import { getLeague } from "../data/leagues.js";
 import { fetchStandings, smallLogo } from "../data/espn.js";
 import { isFavorite } from "../store.js";
-import { setTitle, backButton, stillOn } from "../ui.js";
+import { setTitle, backButton, stillOn, isRefreshing, markUpdated } from "../ui.js";
 
 export async function leagueScreen(screen, leagueId) {
   const league = getLeague(leagueId);
@@ -21,15 +21,20 @@ export async function leagueScreen(screen, leagueId) {
     return;
   }
 
-  screen.innerHTML = `
-    <div class="toolbar">${backButton("Leagues")}<span></span></div>
-    <div class="card dim">Loading standings…</div>`;
+  // When refreshing, keep the old standings showing until new ones arrive
+  const refreshing = isRefreshing();
+  if (!refreshing) {
+    screen.innerHTML = `
+      <div class="toolbar">${backButton("Leagues")}<span></span></div>
+      <div class="card dim">Loading standings…</div>`;
+  }
 
   let standings;
   try {
     standings = await fetchStandings(league);
   } catch {
-    if (stillOn(here)) {
+    // A failed refresh keeps the old info; a failed first load shows a note
+    if (stillOn(here) && !refreshing) {
       screen.innerHTML = `
         <div class="toolbar">${backButton("Leagues")}<span></span></div>
         <div class="card dim">Couldn't load standings. Check your connection.</div>`;
@@ -46,6 +51,7 @@ export async function leagueScreen(screen, leagueId) {
       <span class="dim small">${standings.season}</span>
     </div>
     <div class="stack">${tables}</div>`;
+  markUpdated();
 }
 
 // One group (division/conference) as a table

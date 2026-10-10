@@ -5,7 +5,8 @@ import { getLeague } from "../data/leagues.js";
 import { fetchTeamGames, smallLogo } from "../data/espn.js";
 import { isFavorite, toggleFavorite } from "../store.js";
 import { fromTeamView } from "../format.js";
-import { setTitle, backButton, stillOn } from "../ui.js";
+import { setTitle, backButton, stillOn, isRefreshing, markUpdated,
+         wireShowAll, rememberExpanded } from "../ui.js";
 
 // How many games to show in each list before "Show all"
 const SHORT_LIST = 5;
@@ -15,16 +16,21 @@ export async function teamScreen(screen, leagueId, teamId) {
   if (!league || !teamId) { location.hash = "#leagues"; return; }
 
   const here = location.hash;
-  setTitle("");
-  screen.innerHTML = `
-    <div class="toolbar">${backButton("Back")}<span></span></div>
-    <div class="card dim">Loading team…</div>`;
+  // When refreshing, keep the old info showing until the new info arrives
+  const refreshing = isRefreshing();
+  if (!refreshing) {
+    setTitle("");
+    screen.innerHTML = `
+      <div class="toolbar">${backButton("Back")}<span></span></div>
+      <div class="card dim">Loading team…</div>`;
+  }
 
   let data;
   try {
     data = await fetchTeamGames(league, teamId);
   } catch {
-    if (stillOn(here)) {
+    // A failed refresh keeps the old info; a failed first load shows a note
+    if (stillOn(here) && !refreshing) {
       screen.innerHTML = `
         <div class="toolbar">${backButton("Back")}<span></span></div>
         <div class="card dim">Couldn't load this team. Check your connection.</div>`;
@@ -42,6 +48,7 @@ export async function teamScreen(screen, leagueId, teamId) {
 
   const subtitle = [team.record, team.standing].filter(Boolean).join(" · ") || league.name;
 
+  const reopenLists = rememberExpanded(screen);
   screen.innerHTML = `
     <div class="toolbar">
       ${backButton("Back")}
@@ -72,12 +79,9 @@ export async function teamScreen(screen, leagueId, teamId) {
   favButton.addEventListener("click", () => { toggleFavorite(league.id, team); showFav(); });
 
   // "Show all" buttons reveal the rest of a long list
-  for (const button of screen.querySelectorAll(".show-all")) {
-    button.addEventListener("click", () => {
-      button.closest(".section").classList.add("expanded");
-      button.remove();
-    });
-  }
+  reopenLists();
+  wireShowAll(screen);
+  markUpdated();
 }
 
 // A heading plus a list of games, with "Show all" if it's long
@@ -124,6 +128,7 @@ function gameRow(game, leagueId, teamId, extraClass) {
 
   return `
     <li class="game-line ${extraClass}"
+        ${game.state === "pre" ? `data-starts="${game.date.getTime()}"` : ""}
         onclick="location.hash = '#team/${leagueId}/${opponent.id}'">
       <span class="dim date">${day}</span>
       <img class="logo tiny" src="${smallLogo(opponent.logo, 48)}" alt="" loading="lazy">

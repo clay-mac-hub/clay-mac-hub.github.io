@@ -22,6 +22,27 @@ function saveFavorites(list) {
   }
 }
 
+// ---------- Settings ----------
+
+// Auto-refresh during games: on unless you've switched it off
+export function autoRefreshOn() {
+  try {
+    return localStorage.getItem("autoRefresh") !== "off";
+  } catch {
+    return true;
+  }
+}
+
+export function setAutoRefresh(on) {
+  try {
+    localStorage.setItem("autoRefresh", on ? "on" : "off");
+  } catch {
+    // storage unavailable — the switch just won't be remembered
+  }
+}
+
+// ---------- Favorites ----------
+
 export function isFavorite(leagueId, teamId) {
   return getFavorites().some(f => f.league === leagueId && f.id === teamId);
 }

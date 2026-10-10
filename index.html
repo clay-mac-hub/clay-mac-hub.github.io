@@ -24,7 +24,15 @@
   <header class="top-bar">
     <!-- js/app.js changes this title to match the current tab -->
     <h1 id="title">CMac Sports</h1>
+    <!-- "Updated 8:02 PM ↻" — tap it to refresh. Hidden on screens without scores. -->
+    <button id="updated" class="updated" hidden><span></span> ↻</button>
   </header>
+
+  <!-- The "Pull to refresh" arrow that appears when you drag the screen down -->
+  <div id="pull" class="pull">
+    <span class="pull-arrow">↓</span>
+    <span class="pull-label">Pull to refresh</span>
+  </div>
 
   <main id="screen">
     <!-- js/app.js puts the current screen's content in here -->
