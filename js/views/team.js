@@ -134,7 +134,8 @@ function gameRow(game, leagueId, teamId, extraClass) {
         onclick="location.hash = '#team/${leagueId}/${opponent.id}'">
       <span class="dim date">${day}</span>
       <img class="logo tiny" src="${smallLogo(opponent.logo, 48)}" alt="" loading="lazy">
-      <span class="opponent">${prefix} ${opponent.abbr}</span>
+      <span class="opponent">${prefix} ${opponent.abbr}
+        ${game.note ? `<span class="game-note">${game.note}</span>` : ""}</span>
       <span class="right">${right}</span>
     </li>`;
 }

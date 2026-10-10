@@ -663,3 +663,8 @@ body {
 }
 .legend > span { display: flex; align-items: center; gap: 5px; }
 .legend .mark { width: 20px; height: 20px; font-size: 12px; }
+
+/* Playoff labels like "NLCS - Game 5 If Necessary" */
+.game-note { color: var(--text-dim); font-size: 12px; font-weight: 600; }
+.game-line .opponent .game-note { display: block; font-weight: 500; }
+.game-line .opponent { white-space: normal; }

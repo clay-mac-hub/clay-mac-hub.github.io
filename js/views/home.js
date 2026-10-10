@@ -1,149 +1,118 @@
-// home.js — the "My Teams" screen.
-// One card per favorite team: record, live score, last result and next game.
+// home.js — the "Dashboard" screen.
+// Only games involving your favorite teams, in three sections:
+//   Live     — being played right now
+//   Upcoming — starting in the next 7 days, soonest first
+//   Results  — finished in the last 7 days, newest first
 
 import { getFavorites } from "../store.js";
-import { getLeague, orderedLeagues } from "../data/leagues.js";
-import { smallLogo, fetchTeamSummary } from "../data/espn.js";
-import { gameTime, fromTeamView } from "../format.js";
-import { markUpdated, stillOn } from "../ui.js";
+import { getLeague } from "../data/leagues.js";
+import { fetchTeamGames } from "../data/espn.js";
+import { gameCard } from "./scores.js";
+import { markUpdated, stillOn, isRefreshing } from "../ui.js";
 
-// The last info downloaded for each team, so coming back to Home shows it
-// instantly while fresh info loads in the background.
-const saved = new Map();
+const DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function homeScreen(screen) {
-  // Your teams, grouped by league in the order you've arranged the leagues.
-  // (Within a league, teams stay in the order you added them.)
-  const order = orderedLeagues().map(league => league.id);
-  const favorites = getFavorites()
-    .sort((a, b) => order.indexOf(a.league) - order.indexOf(b.league));
+// The last Dashboard drawn, so coming back to it shows instantly while
+// fresh scores load in the background.
+let lastDrawn = "";
+
+export async function homeScreen(screen) {
+  const favorites = getFavorites();
 
   // First launch: nothing picked yet, so point the way to the picker
   if (favorites.length === 0) {
+    lastDrawn = "";
     screen.innerHTML = `
       <div class="card empty">
         <p><strong>No favorite teams yet</strong></p>
-        <p class="dim">Pick your teams to see their latest scores and next games here.</p>
+        <p class="dim">Pick your teams to see their live games, upcoming games and recent results here.</p>
         <a class="button" href="#favorites">Add Favorite Teams</a>
       </div>
     `;
     return;
   }
 
-  // Draw every card straight away (with whatever we already know)...
-  screen.innerHTML = `
+  // Show what we had last time (or "Loading") while new scores download.
+  // When refreshing, leave the screen exactly as it is.
+  if (!isRefreshing()) {
+    screen.innerHTML = lastDrawn || `
+      ${toolbar()}
+      <div class="card dim">Loading your games…</div>`;
+  }
+
+  // Get every favorite team's season of games at the same time
+  const here = location.hash;
+  const results = await Promise.allSettled(
+    favorites.map(team => fetchTeamGames(getLeague(team.league), team.id)));
+  if (!stillOn(here)) return;   // you moved to another screen while waiting
+
+  const html = dashboard(favorites, results);
+  // If every download failed (e.g. no signal), keep showing the old games
+  if (html === null) {
+    if (!lastDrawn) {
+      screen.innerHTML = `${toolbar()}
+        <div class="card dim">Couldn't load your games. Check your connection.</div>`;
+    }
+    return;
+  }
+  lastDrawn = html;
+  screen.innerHTML = html;
+  markUpdated();
+}
+
+function toolbar() {
+  return `
     <div class="toolbar">
       <span></span>
-      <a class="button-link" href="#favorites">Edit</a>
-    </div>
-    <div class="stack">
-      ${favorites.map(team => `<div class="card team-card tappable" id="card-${team.league}-${team.id}"
-            style="--team-color: ${team.color}"
-            onclick="location.hash = '#team/${team.league}/${team.id}'">${cardContent(team)}</div>`).join("")}
-    </div>
-  `;
+      <a class="button-link" href="#favorites">Edit Teams</a>
+    </div>`;
+}
 
-  // ...then fetch fresh info for each team and redraw its card when it arrives
-  const here = location.hash;
-  const loads = favorites.map(team => {
-    const key = `${team.league}-${team.id}`;
-    return fetchTeamSummary(getLeague(team.league), team.id)
-      .then(summary => saved.set(key, summary))
-      .catch(() => saved.set(key, saved.get(key) ?? "error"))
-      .finally(() => {
-        const card = document.getElementById(`card-${key}`);
-        if (card) card.innerHTML = cardContent(team);   // only if still on screen
-      });
+// Build the three sections from every team's games.
+// Returns null if nothing could be downloaded at all.
+function dashboard(favorites, results) {
+  const now = Date.now();
+  const isFav = (leagueId, team) =>
+    favorites.some(f => f.league === leagueId && f.id === team.id);
+
+  // Collect the games in the 7-day window either side of now. When two of
+  // your teams play each other, the game appears once.
+  const games = new Map();
+  const failed = [];
+  results.forEach((result, i) => {
+    const team = favorites[i];
+    if (result.status === "rejected") { failed.push(team.name); return; }
+    for (const game of result.value.games) {
+      const time = game.date.getTime();
+      if (time < now - DAYS * DAY_MS || time > now + DAYS * DAY_MS) continue;
+      games.set(`${team.league}-${game.id}`, { league: getLeague(team.league), game });
+    }
   });
+  if (failed.length === favorites.length) return null;
 
-  // Once every card has its info, show "Updated 8:02 PM"
-  return Promise.allSettled(loads).then(() => {
-    if (stillOn(here)) markUpdated();
-  });
-}
+  const all = [...games.values()].sort((a, b) => a.game.date - b.game.date);
+  const live = all.filter(({ game }) => game.state === "in");
+  const upcoming = all.filter(({ game }) => game.state === "pre");
+  const finished = all.filter(({ game }) => game.state === "post").reverse();   // newest first
 
-// The inside of one team's card
-function cardContent(team) {
-  const summary = saved.get(`${team.league}-${team.id}`);
-  const leagueName = getLeague(team.league)?.name ?? "";
+  const cards = list => `<ul class="list">${list.map(({ league, game }) =>
+    gameCard(league, game, isFav, { showLeague: true, showDate: true })).join("")}</ul>`;
 
-  // Top line under the name: "2-2 · 3rd in NFC North" (or the league name)
-  const subtitle = summary && summary !== "error"
-    ? [summary.record, summary.standing].filter(Boolean).join(" · ") || leagueName
-    : leagueName;
+  const section = (title, list, emptyText, first = false) => `
+    <div class="section ${first ? "first" : ""}">
+      <h2 class="section-title">${title}</h2>
+      ${list.length ? cards(list) : `<div class="card dim small">${emptyText}</div>`}
+    </div>`;
 
-  let games;
-  if (!summary) {
-    games = `<div class="game-row dim">Loading…</div>`;
-  } else if (summary === "error") {
-    games = `<div class="game-row dim">Couldn't load scores. Check your connection.</div>`;
-  } else {
-    games = [
-      summary.live && liveRow(summary.live, team.id),
-      summary.last && lastRow(summary.last, team.id),
-      summary.next && nextRow(summary.next, team.id),
-    ].filter(Boolean).join("") || `<div class="game-row dim">No games scheduled</div>`;
-  }
-
+  // Live only appears while something is on
   return `
-    <div class="team-head">
-      <img class="logo big" src="${smallLogo(team.logo, 132)}" alt="">
-      <div>
-        <div class="team-name">${team.name}</div>
-        <div class="dim small">${subtitle}</div>
-      </div>
-    </div>
-    <div class="games">${games}</div>
+    ${toolbar()}
+    ${live.length ? section("Live", live, "", true) : ""}
+    ${section("Upcoming", upcoming, "No games in the next 7 days.", !live.length)}
+    ${section("Results", finished, "No results in the last 7 days.")}
+    ${failed.length
+      ? `<p class="dim note">Couldn't load ${failed.join(", ")}. Pull down to try again.</p>`
+      : ""}
   `;
-}
-
-// "LIVE  21–17 @ ARI   Q3 5:12"
-function liveRow(game, teamId) {
-  const { prefix, us, opponent } = fromTeamView(game, teamId);
-  return `
-    <div class="game-row">
-      <span class="badge live">LIVE</span>
-      <span class="score">${us.score ?? 0}–${opponent.score ?? 0}</span>
-      <span>${prefix} ${opponent.abbr}</span>
-      <span class="dim right">${game.detail}</span>
-    </div>`;
-}
-
-// "LAST  W 31–30 vs NO   Final/OT"
-function lastRow(game, teamId) {
-  const { prefix, us, opponent } = fromTeamView(game, teamId);
-
-  // No scores means the game didn't happen (e.g. "Postponed")
-  if (us.score == null || opponent.score == null) {
-    return `
-      <div class="game-row">
-        <span class="badge">LAST</span>
-        <span>${prefix} ${opponent.abbr}</span>
-        <span class="dim right">${game.detail}</span>
-      </div>`;
-  }
-
-  // W = win, L = loss, D = draw/tie
-  const result = us.winner ? "W" : opponent.winner ? "L" : "D";
-  return `
-    <div class="game-row">
-      <span class="badge">LAST</span>
-      <span class="result result-${result}">${result}</span>
-      <span class="score">${us.score}–${opponent.score}</span>
-      <span>${prefix} ${opponent.abbr}</span>
-      <span class="dim right">${game.detail}</span>
-    </div>`;
-}
-
-// "NEXT  @ ARI   Sun, Oct 11 · 4:25 PM · Fox"
-function nextRow(game, teamId) {
-  const { prefix, opponent } = fromTeamView(game, teamId);
-  const when = [gameTime(game), game.broadcast].filter(Boolean).join(" · ");
-  // data-starts tells auto-refresh when this game begins
-  return `
-    <div class="game-row" data-starts="${game.date.getTime()}">
-      <span class="badge">NEXT</span>
-      <span>${prefix} ${opponent.abbr}</span>
-      <span class="dim right">${when}</span>
-    </div>`;
 }

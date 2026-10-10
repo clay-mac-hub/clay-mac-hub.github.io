@@ -132,7 +132,7 @@ function gamesList(leagues, results, day) {
 
     const rows = [
       ...shown.map(g => gameCard(league, g, isFav)),
-      ...hidden.map(g => gameCard(league, g, isFav, "extra")),
+      ...hidden.map(g => gameCard(league, g, isFav, { extraClass: "extra" })),
     ].join("");
 
     sections.push(`
@@ -152,7 +152,7 @@ function gamesList(leagues, results, day) {
     <div class="section first">
       <h2 class="section-title">My Teams</h2>
       <ul class="list">
-        ${myGames.map(({ league, game }) => gameCard(league, game, isFav, "", true)).join("")}
+        ${myGames.map(({ league, game }) => gameCard(league, game, isFav, { showLeague: true })).join("")}
       </ul>
     </div>` : "";
 
@@ -169,8 +169,13 @@ export function standingsLink(league) {
 }
 
 // One game: away team above home team, status on the right.
-// showLeague adds a small league label (used in "My Teams").
-function gameCard(league, game, isFav, extraClass = "", showLeague = false) {
+// Options:
+//   extraClass — e.g. "extra" for games hidden until "Show all"
+//   showLeague — add a small league label (used in "My Teams" and Dashboard)
+//   showDate   — add the game's day, and W/L for your team (used on Dashboard,
+//                where games from different days are listed together)
+export function gameCard(league, game, isFav,
+                         { extraClass = "", showLeague = false, showDate = false } = {}) {
   const finished = game.state === "post";
 
   const teamLine = team => {
@@ -186,6 +191,12 @@ function gameCard(league, game, isFav, extraClass = "", showLeague = false) {
       </div>`;
   };
 
+  // "Sun 10/11"
+  const day = showDate
+    ? `<span class="dim small">${game.date.toLocaleDateString(undefined,
+        { weekday: "short", month: "numeric", day: "numeric" })}</span>`
+    : "";
+
   let status;
   if (game.state === "in") {
     status = `<span class="badge live">LIVE</span><span class="small">${game.detail}</span>`;
@@ -193,9 +204,18 @@ function gameCard(league, game, isFav, extraClass = "", showLeague = false) {
     const time = game.timeKnown
       ? game.date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
       : "TBD";
-    status = `<span>${time}</span><span class="dim small">${game.broadcast}</span>`;
+    status = `${day}<span>${time}</span><span class="dim small">${game.broadcast}</span>`;
   } else {
-    status = `<span class="dim">${game.detail}</span>`;
+    // On Dashboard: W/L/D for your team (skipped if both teams are yours)
+    let result = "";
+    const homeFav = isFav(league.id, game.home), awayFav = isFav(league.id, game.away);
+    if (showDate && homeFav !== awayFav && game.home.score != null && game.away.score != null) {
+      const us = homeFav ? game.home : game.away;
+      const them = homeFav ? game.away : game.home;
+      const letter = us.winner ? "W" : them.winner ? "L" : "D";
+      result = `<span class="result result-${letter}">${letter}</span> `;
+    }
+    status = `<span>${result}<span class="dim">${game.detail}</span></span>${day}`;
   }
 
   // data-starts tells auto-refresh when a not-yet-started game begins
@@ -203,6 +223,7 @@ function gameCard(league, game, isFav, extraClass = "", showLeague = false) {
     <li class="score-card ${extraClass}"
         ${game.state === "pre" ? `data-starts="${game.date.getTime()}"` : ""}>
       <div class="teams">
+        ${game.note ? `<div class="game-note">${game.note}</div>` : ""}
         ${teamLine(game.away)}
         ${teamLine(game.home)}
       </div>

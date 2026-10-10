@@ -41,9 +41,10 @@ export async function fetchTeams(league) {
 
 // ESPN describes a game in a big, nested way. This turns one into our own
 // simple shape:
-// { id, date, timeKnown, state, detail, broadcast, home: {...}, away: {...} }
+// { id, date, timeKnown, state, detail, broadcast, note, home: {...}, away: {...} }
 // state is "pre" (not started), "in" (live) or "post" (finished).
 // detail is ESPN's short status text, e.g. "Final", "Q3 5:12", "Halftime".
+// note is ESPN's label for special games, e.g. "NLCS - Game 5 If Necessary".
 function toGame(event) {
   const comp = event.competitions[0];
   const status = comp.status ?? event.status;
@@ -74,6 +75,7 @@ function toGame(event) {
     state: status.type.state,
     detail: status.type.shortDetail,
     broadcast: broadcast?.media?.shortName ?? broadcast?.names?.[0] ?? "",
+    note: comp.notes?.[0]?.headline ?? "",
     home: side("home"),
     away: side("away"),
   };
