@@ -1,19 +1,21 @@
 // favorites.js — the "Favorite Teams" picker.
 // Choose a league, (optionally) search, and tap the star next to a team.
 
-import { LEAGUES, getLeague } from "../data/leagues.js";
+import { orderedLeagues, getLeague } from "../data/leagues.js";
 import { fetchTeams, smallLogo } from "../data/espn.js";
 import { isFavorite, toggleFavorite, getFavorites } from "../store.js";
 
-// Only leagues with teams can be picked from (not golf)
-const TEAM_LEAGUES = LEAGUES.filter(league => league.hasTeams);
-
 // Which league chip is selected. Kept here so it's remembered between visits.
-let selectedLeagueId = TEAM_LEAGUES[0].id;
+// (null = start on the first league in your order)
+let selectedLeagueId = null;
 
 export function favoritesScreen(screen) {
+  // Only leagues with teams can be picked from (not golf), in your order
+  const teamLeagues = orderedLeagues().filter(league => league.hasTeams);
+  selectedLeagueId ??= teamLeagues[0].id;
+
   // The league chips across the top, a search box, then the team list
-  const chips = TEAM_LEAGUES.map(league => `
+  const chips = teamLeagues.map(league => `
     <button class="chip ${league.id === selectedLeagueId ? "selected" : ""}"
             data-league="${league.id}">${league.name}</button>
   `).join("");

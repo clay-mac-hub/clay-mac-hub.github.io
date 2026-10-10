@@ -15,7 +15,7 @@ export async function golfScreen(screen, league) {
 
   if (!refreshing) {
     screen.innerHTML = `
-      <div class="toolbar">${backButton("Leagues")}<span></span></div>
+      <div class="toolbar">${backButton("Back")}<span></span></div>
       <div class="card dim">Loading leaderboard…</div>`;
   }
 
@@ -26,7 +26,7 @@ export async function golfScreen(screen, league) {
     // A failed refresh keeps the old leaderboard; a failed first load shows a note
     if (stillOn(here) && !refreshing) {
       screen.innerHTML = `
-        <div class="toolbar">${backButton("Leagues")}<span></span></div>
+        <div class="toolbar">${backButton("Back")}<span></span></div>
         <div class="card dim">Couldn't load the leaderboard. Check your connection.</div>`;
     }
     return;
@@ -35,13 +35,13 @@ export async function golfScreen(screen, league) {
 
   if (!board) {
     screen.innerHTML = `
-      <div class="toolbar">${backButton("Leagues")}<span></span></div>
+      <div class="toolbar">${backButton("Back")}<span></span></div>
       <div class="card empty"><p class="dim">No tournament scheduled right now.</p></div>`;
     markUpdated();
     return;
   }
 
-  const rows = board.players.map((p, i) => playerRow(p, i >= SHORT_LIST ? "extra" : "")).join("");
+  const rows = board.players.map((p, i) => playerRow(league, p, i >= SHORT_LIST ? "extra" : "")).join("");
   let leaderboard;
   if (board.players.length) {
     leaderboard = `
@@ -62,7 +62,7 @@ export async function golfScreen(screen, league) {
 
   const reopenLists = rememberExpanded(screen);
   screen.innerHTML = `
-    <div class="toolbar">${backButton("Leagues")}<span></span></div>
+    <div class="toolbar">${backButton("Back")}<span></span></div>
     ${tournamentHeader(board)}
     ${leaderboard}`;
   reopenLists();
@@ -107,12 +107,12 @@ export function tournamentDates(board) {
   return `${first} – ${last}`;
 }
 
-// One player on the leaderboard
-function playerRow(player, extraClass) {
+// One player on the leaderboard. Tap to see their scorecards.
+function playerRow(league, player, extraClass) {
   // Under par (e.g. "-9") shows in red, like on TV leaderboards
   const under = player.toPar.startsWith("-");
   return `
-    <tr class="${extraClass}">
+    <tr class="${extraClass}" onclick="location.hash = '#golfer/${league.id}/${player.id}'">
       <td class="pos">${player.pos}</td>
       <td class="team-cell">
         ${player.flag ? `<img class="flag" src="${smallLogo(player.flag, 40)}" alt="" loading="lazy">` : ""}
@@ -145,7 +145,7 @@ export function golfSummaryCard(league, board) {
 
   return `
     <div class="section">
-      <h2 class="section-title">${league.name}</h2>
+      <h2 class="section-title"><a href="#league/${league.id}">${league.name} <span class="chevron">›</span></a></h2>
       <div class="card tournament tappable" onclick="location.hash = '#league/${league.id}'">
         <div class="tournament-name">${board.name}</div>
         ${statusLine(board)}

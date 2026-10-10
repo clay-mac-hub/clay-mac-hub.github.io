@@ -441,6 +441,46 @@ body {
   padding: 0;
 }
 
+/* ---------- League Order screen ---------- */
+
+.top-note { margin: 0 4px 10px; }
+
+.drag-handle {
+  margin-left: auto;
+  padding: 0 4px 0 20px;     /* a wide area that's easy to grab */
+  color: var(--text-dim);
+  font-size: 24px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;        /* dragging the handle moves the row, not the page */
+}
+
+.reorder li.dragging {
+  background: var(--separator);
+  position: relative;
+  z-index: 1;
+}
+
+.reset { margin: 14px 4px; border: none; background: none; font: inherit; font-size: 15px; padding: 0; }
+
+/* Section titles that link to a league's standings */
+.section-title a { color: inherit; text-decoration: none; }
+.section-title .chevron { color: var(--text-dim); font-weight: 500; }
+
+/* Team page: "NFL Standings ›" row */
+.standings-link {
+  display: flex;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--separator);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+/* The team you came from, highlighted in the standings */
+.standings tr.focus td { background: rgba(10, 132, 255, 0.15); }
+
 /* ---------- Golf ---------- */
 
 .tournament { display: flex; flex-direction: column; gap: 4px; }
@@ -550,3 +590,76 @@ body {
 }
 
 .dim { color: var(--text-dim); }
+
+/* "Reorder leagues" link at the bottom of the Scores tab */
+.reorder-link { display: block; margin: 24px 4px 0; font-size: 15px; }
+
+/* ---------- Golfer scorecards ---------- */
+
+.headshot {
+  width: 64px; height: 64px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--separator);
+}
+.golfer-card .badge { margin-left: auto; }
+
+/* POS / TOTAL / TODAY / THRU boxes */
+.golfer-facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--separator);
+  text-align: center;
+}
+.golfer-facts .big { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.golfer-facts .small-text { font-size: 15px; line-height: 29px; }
+
+.round-head { display: flex; align-items: baseline; justify-content: space-between; }
+.round-score { display: flex; gap: 6px; margin-right: 4px; font-size: 17px; }
+
+.scorecard { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+
+/* One nine-hole table: label column, 9 holes, total */
+.nine {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.nine th { width: 42px; text-align: left; font-weight: 600; color: var(--text-dim); }
+.nine td:last-child { width: 34px; font-weight: 600; }
+.nine td, .nine th { padding: 3px 0; }
+.nine .hole-row td { color: var(--text-dim); font-weight: 600; }
+.nine .par-row td { color: var(--text-dim); border-bottom: 0.5px solid var(--separator); padding-bottom: 6px; }
+.nine .score-row td { padding-top: 6px; font-size: 14px; }
+
+/* Score marks: circle = birdie, double circle = eagle,
+   square = bogey, double square = double bogey or worse */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  font-weight: 600;
+}
+.mark.birdie { border: 1.5px solid var(--live); border-radius: 50%; color: var(--live); }
+.mark.eagle  { border: 3.5px double var(--live); border-radius: 50%; color: var(--live); }
+.mark.bogey  { border: 1.5px solid var(--text-dim); border-radius: 3px; }
+.mark.double { border: 3.5px double var(--text-dim); border-radius: 3px; }
+
+.stats-line { border-top: 0.5px solid var(--separator); padding-top: 8px; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin: 18px 0 0;
+}
+.legend > span { display: flex; align-items: center; gap: 5px; }
+.legend .mark { width: 20px; height: 20px; font-size: 12px; }

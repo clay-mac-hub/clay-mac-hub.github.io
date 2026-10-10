@@ -176,9 +176,22 @@ export async function fetchTeamSummary(league, teamId) {
 
 // ---------- Golf ----------
 
+// Golf scores are written relative to par: "-3", "+2" or "E" (even).
+// "-" or blank means "not played yet".
+function parseToPar(text) {
+  if (text === "E") return 0;
+  const number = Number(text);
+  return text && text !== "-" && Number.isFinite(number) ? number : null;
+}
+
+export function formatToPar(number) {
+  if (number == null) return "";
+  return number === 0 ? "E" : number > 0 ? `+${number}` : `${number}`;
+}
+
 // The current (or next) tournament on a tour, with its leaderboard:
-// { name, start, end, course, city, purse, champion, state, detail, round,
-//   players: [{ pos, name, shortName, flag, toPar, today, thru, state }] }
+// { id, name, start, end, course, city, purse, champion, state, detail, round,
+//   players: [{ id, pos, name, shortName, flag, toPar, today, thru, state }] }
 // state is "pre" (not started), "in" (being played) or "post" (finished).
 export async function fetchLeaderboard(league) {
   const tour = league.path.split("/")[1];   // "golf/pga" -> "pga"
@@ -189,14 +202,26 @@ export async function fetchLeaderboard(league) {
   const comp = event.competitions[0];
   const course = event.courses?.[0];
   const round = comp.status?.period ?? 0;
+  const tournamentState = comp.status?.type?.state ?? "pre";
 
-  const players = (comp.competitors ?? [])
+  let players = (comp.competitors ?? [])
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map(player => {
       const status = player.status ?? {};
       const state = status.type?.state ?? "pre";
-      // This round's score to par, e.g. "-3" ("-" if they haven't started)
-      const today = player.linescores?.find(l => l.period === round)?.displayValue;
+      const espnPos = status.position?.displayName ?? "";
+
+      // TOTAL: add up every round played so far, INCLUDING the round in
+      // progress. (ESPN's own total only counts finished rounds.)
+      const roundScores = (player.linescores ?? [])
+        .map(l => parseToPar(l.displayValue))
+        .filter(score => score != null);
+      let total = roundScores.length ? roundScores.reduce((a, b) => a + b, 0) : null;
+      // Hasn't teed off in round 1 yet, but the tournament has started: even par
+      if (total == null && tournamentState !== "pre") total = 0;
+
+      // This round's score to par, e.g. "-3"
+      const today = parseToPar(player.linescores?.find(l => l.period === round)?.displayValue);
 
       // "Thru 12" while playing, "F" when done, their tee time before starting
       let thru = status.displayValue ?? "";
@@ -206,18 +231,26 @@ export async function fetchLeaderboard(league) {
       }
 
       return {
-        pos: status.position?.displayName ?? "",
+        id: player.id,
+        espnPos,
+        // Still competing? (Not "CUT", "WD", "DQ"…) Only these get re-ranked.
+        inContention: espnPos === "" || /^T?\d+$/.test(espnPos),
+        total,
         name: player.athlete.displayName,
         shortName: player.athlete.shortName ?? player.athlete.displayName,   // "K. Mitchell"
         flag: player.athlete.flag?.href ?? "",
-        toPar: player.score?.displayValue ?? player.score ?? "",
-        today: today && today !== "-" ? today : "",
+        toPar: formatToPar(total),
+        today: formatToPar(today),
         thru,
         state,
       };
     });
 
+  players = rankPlayers(players);
+
   return {
+    id: event.id,
+    tour,
     name: event.name,
     start: new Date(event.date),
     end: new Date(event.endDate),
@@ -226,10 +259,63 @@ export async function fetchLeaderboard(league) {
       .filter(Boolean).join(", "),
     purse: event.displayPurse ?? "",
     champion: event.defendingChampion?.athlete?.displayName ?? "",
-    state: comp.status?.type?.state ?? "pre",
+    state: tournamentState,
     detail: comp.status?.type?.detail ?? "",
     round,
     players,
+  };
+}
+
+// Put players in order of their up-to-the-minute totals and number them,
+// with "T" for ties (T3, T3, T3, then 6). Players who were cut or withdrew
+// stay at the bottom with ESPN's label ("CUT", "WD"…).
+function rankPlayers(players) {
+  const ranked = players.filter(p => p.inContention && p.total != null);
+  const others = players.filter(p => !(p.inContention && p.total != null));
+  if (ranked.length === 0) return players.map(p => ({ ...p, pos: p.espnPos }));
+
+  ranked.sort((a, b) => a.total - b.total);   // keeps ESPN's order for ties
+  for (const player of ranked) {
+    const better = ranked.filter(p => p.total < player.total).length;
+    const tied = ranked.filter(p => p.total === player.total).length;
+    player.pos = `${tied > 1 ? "T" : ""}${better + 1}`;
+  }
+  for (const player of others) player.pos = player.espnPos;
+  return [...ranked, ...others];
+}
+
+// One golfer's hole-by-hole scorecard for every round of a tournament:
+// { name, headshot, age,
+//   rounds: [{ number, strokes, toPar, teeTime, startTee,
+//              holes: [{ hole, par, strokes }], stats: { birdies, bogeys, … } }] }
+export async function fetchScorecard(tour, eventId, playerId) {
+  const data = await cachedJSON(
+    `${BASE}/golf/${tour}/leaderboard/${eventId}/playersummary?player=${playerId}`);
+
+  const rounds = (data.rounds ?? []).map(round => {
+    // Birdies, bogeys etc. for the round, as a simple lookup
+    const stats = {};
+    for (const stat of round.statistics?.categories?.[0]?.stats ?? []) {
+      stats[stat.name] = stat.value;
+    }
+    return {
+      number: round.period,
+      strokes: round.value || null,
+      toPar: round.displayValue ?? "",
+      teeTime: round.teeTime ? new Date(round.teeTime) : null,
+      startTee: round.startTee ?? 1,
+      holes: (round.linescores ?? [])
+        .map(h => ({ hole: h.period, par: h.par ?? null, strokes: h.value ?? null }))
+        .sort((a, b) => a.hole - b.hole),
+      stats,
+    };
+  }).sort((a, b) => a.number - b.number);
+
+  return {
+    name: data.profile?.displayName ?? "",
+    headshot: data.profile?.headshot ?? "",
+    age: data.profile?.age ?? null,
+    rounds,
   };
 }
 

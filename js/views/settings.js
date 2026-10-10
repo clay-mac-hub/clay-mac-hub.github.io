@@ -9,6 +9,8 @@ export function settingsScreen(screen) {
     <ul class="list">
       <li><a class="row-link" href="#favorites">Favorite teams
         <span class="dim right">${count} ›</span></a></li>
+      <li><a class="row-link" href="#order">League order
+        <span class="dim right">›</span></a></li>
       <li>
         <label for="auto-refresh">Auto-refresh during games</label>
         <input type="checkbox" class="switch" id="auto-refresh" ${autoRefreshOn() ? "checked" : ""}>

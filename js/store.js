@@ -41,6 +41,24 @@ export function setAutoRefresh(on) {
   }
 }
 
+// The order you've arranged the leagues in: a list of league ids like
+// ["nfl", "epl", "pga", ...]. Empty means "the standard order".
+export function getLeagueOrder() {
+  try {
+    return JSON.parse(localStorage.getItem("leagueOrder")) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function setLeagueOrder(ids) {
+  try {
+    localStorage.setItem("leagueOrder", JSON.stringify(ids));
+  } catch {
+    // storage unavailable — the order just won't be remembered
+  }
+}
+
 // ---------- Favorites ----------
 
 export function isFavorite(leagueId, teamId) {

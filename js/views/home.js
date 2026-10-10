@@ -2,7 +2,7 @@
 // One card per favorite team: record, live score, last result and next game.
 
 import { getFavorites } from "../store.js";
-import { getLeague } from "../data/leagues.js";
+import { getLeague, orderedLeagues } from "../data/leagues.js";
 import { smallLogo, fetchTeamSummary } from "../data/espn.js";
 import { gameTime, fromTeamView } from "../format.js";
 import { markUpdated, stillOn } from "../ui.js";
@@ -12,7 +12,11 @@ import { markUpdated, stillOn } from "../ui.js";
 const saved = new Map();
 
 export function homeScreen(screen) {
-  const favorites = getFavorites();
+  // Your teams, grouped by league in the order you've arranged the leagues.
+  // (Within a league, teams stay in the order you added them.)
+  const order = orderedLeagues().map(league => league.id);
+  const favorites = getFavorites()
+    .sort((a, b) => order.indexOf(a.league) - order.indexOf(b.league));
 
   // First launch: nothing picked yet, so point the way to the picker
   if (favorites.length === 0) {

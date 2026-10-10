@@ -15,7 +15,9 @@
 //   topGamesOnly    — on the Scores screen, show Top 25 and favorite teams'
 //                     games first and hide the rest behind "Show all"
 
-const RECORD = [["W", "wins"], ["L", "losses"], ["PCT", "winpercent"], ["GB", "gamesbehind"]];
+import { getLeagueOrder } from "../store.js";
+
+const RECORD =[["W", "wins"], ["L", "losses"], ["PCT", "winpercent"], ["GB", "gamesbehind"]];
 const COLLEGE = [["CONF", "vsconf"], ["OVR", "total"]];
 const SOCCER = [["GP", "gamesplayed"], ["W", "wins"], ["D", "ties"], ["L", "losses"],
                 ["GD", "pointdifferential"], ["PTS", "points"]];
@@ -48,4 +50,16 @@ export const LEAGUES = [
 // Look up one league by its id, e.g. getLeague("nfl")
 export function getLeague(id) {
   return LEAGUES.find(league => league.id === id);
+}
+
+// All leagues, in the order you've arranged them (Settings → League Order).
+// Any league missing from your saved order (e.g. one added to the app
+// later) goes at the end, in the standard order.
+export function orderedLeagues() {
+  const saved = getLeagueOrder();
+  const position = id => {
+    const i = saved.indexOf(id);
+    return i === -1 ? saved.length + LEAGUES.findIndex(l => l.id === id) : i;
+  };
+  return [...LEAGUES].sort((a, b) => position(a.id) - position(b.id));
 }

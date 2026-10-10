@@ -63,6 +63,8 @@ export async function teamScreen(screen, leagueId, teamId) {
           <div class="dim small">${subtitle}</div>
         </div>
       </div>
+      <a class="standings-link" href="#league/${league.id}/${team.id}">
+        ${league.name} Standings <span class="right">›</span></a>
     </div>
 
     ${live.length ? section("Live", live, league.id, team.id) : ""}

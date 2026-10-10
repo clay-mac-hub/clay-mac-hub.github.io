@@ -13,6 +13,8 @@ import { settingsScreen } from "./views/settings.js";
 import { favoritesScreen } from "./views/favorites.js";
 import { leagueScreen } from "./views/league.js";
 import { teamScreen } from "./views/team.js";
+import { orderScreen } from "./views/order.js";
+import { golferScreen } from "./views/golfer.js";
 import { setTitle, setRefreshing, hideUpdated } from "./ui.js";
 import { clearScoreCache } from "./data/espn.js";
 import { autoRefreshOn } from "./store.js";
@@ -23,13 +25,15 @@ import { enablePullToRefresh } from "./pull.js";
 // Only the first four are tabs in the bottom bar; "tab" says which tab a
 // non-tab page belongs to (others keep the tab you came from).
 const screens = {
-  home:      { title: "My Teams",       draw: homeScreen },
+  home:      { title: "Dashboard",      draw: homeScreen },
   scores:    { title: "Scores",         draw: scoresScreen },
   leagues:   { title: "Leagues",        draw: leaguesScreen },
   settings:  { title: "Settings",       draw: settingsScreen },
   favorites: { title: "Favorite Teams", draw: favoritesScreen },
   league:    { title: "",               draw: leagueScreen, tab: "leagues" },
   team:      { title: "",               draw: teamScreen },
+  order:     { title: "League Order",   draw: orderScreen },
+  golfer:    { title: "",               draw: golferScreen, tab: "leagues" },
 };
 
 const TABS = ["home", "scores", "leagues", "settings"];
