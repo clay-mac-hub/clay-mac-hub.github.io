@@ -20,14 +20,15 @@ import { enablePullToRefresh } from "./pull.js";
 
 // A lookup table: screen name -> its title and the function that draws it.
 // Screens with no title here set their own (e.g. a team's name).
-// Only the first four are tabs in the bottom bar.
+// Only the first four are tabs in the bottom bar; "tab" says which tab a
+// non-tab page belongs to (others keep the tab you came from).
 const screens = {
   home:      { title: "My Teams",       draw: homeScreen },
   scores:    { title: "Scores",         draw: scoresScreen },
   leagues:   { title: "Leagues",        draw: leaguesScreen },
   settings:  { title: "Settings",       draw: settingsScreen },
   favorites: { title: "Favorite Teams", draw: favoritesScreen },
-  league:    { title: "",               draw: leagueScreen },
+  league:    { title: "",               draw: leagueScreen, tab: "leagues" },
   team:      { title: "",               draw: teamScreen },
 };
 
@@ -52,9 +53,10 @@ function showCurrentScreen(refresh = false) {
 
   // Highlight the selected tab. Pages that aren't tabs (like a team page)
   // leave the highlight on the tab you came from.
-  if (TABS.includes(name)) {
+  const tab = TABS.includes(name) ? name : screens[name].tab;
+  if (tab) {
     for (const link of document.querySelectorAll(".tab-bar a")) {
-      link.classList.toggle("active", link.dataset.tab === name);
+      link.classList.toggle("active", link.dataset.tab === tab);
     }
   }
 

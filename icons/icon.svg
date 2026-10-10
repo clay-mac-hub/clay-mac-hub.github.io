@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- CMac Sports app icon. The PNG icons are made from this file by
+       running: sh tools/make_icons.sh   (iPhone rounds the corners itself) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a84ff"/>
+      <stop offset="1" stop-color="#0b1f5c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Blue background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Faint stadium-light rings -->
+  <circle cx="512" cy="470" r="330" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="28"/>
+  <circle cx="512" cy="470" r="230" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="20"/>
+
+  <!-- "CM" monogram -->
+  <text x="512" y="575" text-anchor="middle"
+        font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="330" font-weight="800" letter-spacing="-12" fill="#ffffff">CM</text>
+
+  <!-- "SPORTS" underneath -->
+  <text x="512" y="742" text-anchor="middle"
+        font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="92" font-weight="700" letter-spacing="26" fill="#ffffff" fill-opacity="0.85">SPORTS</text>
+
+  <!-- Red "live" dot -->
+  <circle cx="812" cy="282" r="44" fill="#ff3b30"/>
+</svg>
