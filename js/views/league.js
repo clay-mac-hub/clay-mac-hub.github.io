@@ -4,6 +4,7 @@
 import { getLeague } from "../data/leagues.js";
 import { fetchStandings, smallLogo } from "../data/espn.js";
 import { isFavorite } from "../store.js";
+import { golfScreen } from "./golf.js";
 import { setTitle, backButton, stillOn, isRefreshing, markUpdated } from "../ui.js";
 
 export async function leagueScreen(screen, leagueId) {
@@ -13,13 +14,8 @@ export async function leagueScreen(screen, leagueId) {
   const here = location.hash;
   setTitle(league.name);
 
-  // Golf tours have leaderboards instead of standings (coming in Step 8)
-  if (!league.hasTeams) {
-    screen.innerHTML = `
-      <div class="toolbar">${backButton("Leagues")}<span></span></div>
-      <div class="card empty"><p class="dim">Tournament leaderboards are coming soon.</p></div>`;
-    return;
-  }
+  // Golf tours have tournament leaderboards instead of standings
+  if (!league.hasTeams) return golfScreen(screen, league);
 
   // When refreshing, keep the old standings showing until new ones arrive
   const refreshing = isRefreshing();

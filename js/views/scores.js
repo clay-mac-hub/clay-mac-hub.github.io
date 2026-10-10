@@ -3,7 +3,8 @@
 // Your favorite teams' games come first, then each league's games.
 
 import { LEAGUES } from "../data/leagues.js";
-import { fetchScoreboard, smallLogo } from "../data/espn.js";
+import { fetchScoreboard, fetchLeaderboard, smallLogo } from "../data/espn.js";
+import { golfSummaryCard, playsOn } from "./golf.js";
 import { getFavorites } from "../store.js";
 import { stillOn, isRefreshing, markUpdated, wireShowAll, rememberExpanded } from "../ui.js";
 
@@ -14,8 +15,9 @@ const DAYS_AHEAD = 7;
 // The chosen day, remembered while the app is open (starts on today)
 let selected = startOfDay(new Date());
 
-// Leagues that have games (golf tours get their own leaderboards in Step 8)
+// Leagues with games between teams, and golf tours (which have tournaments)
 const GAME_LEAGUES = LEAGUES.filter(league => league.hasTeams);
+const GOLF_TOURS = LEAGUES.filter(league => !league.hasTeams);
 
 export async function scoresScreen(screen) {
   const here = location.hash;
@@ -44,14 +46,22 @@ export async function scoresScreen(screen) {
 
   // Download every league's games for that day at the same time.
   // A league that fails just shows a short note instead of its games.
+  // Golf tournaments are fetched alongside, and shown if they run that day.
   const day = selected;
-  const results = await Promise.allSettled(
-    GAME_LEAGUES.map(league => fetchScoreboard(league, day)));
+  const [results, golf] = await Promise.all([
+    Promise.allSettled(GAME_LEAGUES.map(league => fetchScoreboard(league, day))),
+    Promise.allSettled(GOLF_TOURS.map(tour => fetchLeaderboard(tour))),
+  ]);
   if (!stillOn(here) || day !== selected) return;   // moved on while waiting
+
+  const golfCards = golf.map((result, i) => {
+    const board = result.status === "fulfilled" ? result.value : null;
+    return board && playsOn(board, day) ? golfSummaryCard(GOLF_TOURS[i], board) : "";
+  }).join("");
 
   const gamesArea = document.getElementById("games");
   const reopenLists = rememberExpanded(gamesArea);
-  gamesArea.innerHTML = gamesList(results);
+  gamesArea.innerHTML = gamesList(results, golfCards);
   reopenLists();
   wireShowAll(gamesArea);   // "Show all" reveals hidden college games
   markUpdated();
@@ -85,7 +95,8 @@ function dateChips() {
 
 // ---------- Games ----------
 
-function gamesList(results) {
+// golfCards: any golf tournament cards for the day, shown after the leagues
+function gamesList(results, golfCards) {
   const favorites = getFavorites();
   const isFav = (leagueId, team) =>
     favorites.some(f => f.league === leagueId && f.id === team.id);
@@ -147,10 +158,10 @@ function gamesList(results) {
       </ul>
     </div>` : "";
 
-  if (!mySection && sections.length === 0) {
+  if (!mySection && sections.length === 0 && !golfCards) {
     return `<div class="card empty"><p class="dim">No games on this day.</p></div>`;
   }
-  return mySection + sections.join("");
+  return mySection + sections.join("") + golfCards;
 }
 
 // One game: away team above home team, status on the right.

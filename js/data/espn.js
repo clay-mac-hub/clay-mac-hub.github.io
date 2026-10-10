@@ -90,11 +90,15 @@ export function fetchScoreboard(league, date = null) {
   if (date) params.push(`dates=${espnDate(date)}`);
   if (league.scoreboardQuery) params.push(league.scoreboardQuery);
   const url = `${BASE}/${league.path}/scoreboard?${params.join("&")}`;
+  return cachedJSON(url).then(data => data.events.map(toGame));
+}
 
+// Like getJSON, but reuses an answer from the last 30 seconds
+function cachedJSON(url) {
   const cached = scoreboardCache[url];
   if (cached && Date.now() - cached.time < 30_000) return cached.promise;
 
-  const promise = getJSON(url).then(data => data.events.map(toGame));
+  const promise = getJSON(url);
   promise.catch(() => delete scoreboardCache[url]);   // don't remember failures
   scoreboardCache[url] = { time: Date.now(), promise };
   return promise;
@@ -167,6 +171,65 @@ export async function fetchTeamSummary(league, teamId) {
     live: games.find(g => g.state === "in") ?? null,
     last: games.filter(g => g.state === "post").at(-1) ?? null,
     next: games.find(g => g.state === "pre") ?? null,
+  };
+}
+
+// ---------- Golf ----------
+
+// The current (or next) tournament on a tour, with its leaderboard:
+// { name, start, end, course, city, purse, champion, state, detail, round,
+//   players: [{ pos, name, shortName, flag, toPar, today, thru, state }] }
+// state is "pre" (not started), "in" (being played) or "post" (finished).
+export async function fetchLeaderboard(league) {
+  const tour = league.path.split("/")[1];   // "golf/pga" -> "pga"
+  const data = await cachedJSON(`${BASE}/golf/leaderboard?league=${tour}`);
+  const event = data.events?.[0];
+  if (!event) return null;   // no tournament scheduled
+
+  const comp = event.competitions[0];
+  const course = event.courses?.[0];
+  const round = comp.status?.period ?? 0;
+
+  const players = (comp.competitors ?? [])
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(player => {
+      const status = player.status ?? {};
+      const state = status.type?.state ?? "pre";
+      // This round's score to par, e.g. "-3" ("-" if they haven't started)
+      const today = player.linescores?.find(l => l.period === round)?.displayValue;
+
+      // "Thru 12" while playing, "F" when done, their tee time before starting
+      let thru = status.displayValue ?? "";
+      if (state === "pre" && status.teeTime) {
+        thru = new Date(status.teeTime)
+          .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      }
+
+      return {
+        pos: status.position?.displayName ?? "",
+        name: player.athlete.displayName,
+        shortName: player.athlete.shortName ?? player.athlete.displayName,   // "K. Mitchell"
+        flag: player.athlete.flag?.href ?? "",
+        toPar: player.score?.displayValue ?? player.score ?? "",
+        today: today && today !== "-" ? today : "",
+        thru,
+        state,
+      };
+    });
+
+  return {
+    name: event.name,
+    start: new Date(event.date),
+    end: new Date(event.endDate),
+    course: course?.name ?? "",
+    city: [course?.address?.city, course?.address?.state ?? course?.address?.country]
+      .filter(Boolean).join(", "),
+    purse: event.displayPurse ?? "",
+    champion: event.defendingChampion?.athlete?.displayName ?? "",
+    state: comp.status?.type?.state ?? "pre",
+    detail: comp.status?.type?.detail ?? "",
+    round,
+    players,
   };
 }
 
