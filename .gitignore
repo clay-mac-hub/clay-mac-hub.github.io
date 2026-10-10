@@ -1,0 +1,3 @@
+# Files that stay on this Mac and are never published
+.claude/
+.DS_Store
