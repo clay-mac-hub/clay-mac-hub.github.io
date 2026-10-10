@@ -90,34 +90,115 @@ function fetchScoreboard(league) {
   return promise;
 }
 
-// Everything the Home card needs for one team:
-// { record: "2-2", standing: "3rd in NFC North", live, last, next }
-// live / last / next are games (or null if there isn't one).
-export async function fetchTeamSummary(league, teamId) {
-  const [info, schedule, scoreboard] = await Promise.all([
-    getJSON(`${BASE}/${league.path}/teams/${teamId}`),
-    getJSON(`${BASE}/${league.path}/teams/${teamId}/schedule`),
+// One team's info plus all its games this season, oldest first:
+// { team: { id, name, abbr, color, logo, record, standing }, games: [...] }
+//
+// ESPN's plain schedule doesn't always cover everything (e.g. NBA preseason
+// only, or soccer past results only), so we also ask for the regular season
+// (or upcoming soccer fixtures) and combine the two.
+export async function fetchTeamGames(league, teamId) {
+  const url = `${BASE}/${league.path}/teams/${teamId}`;
+  const extra = league.path.startsWith("soccer") ? "fixture=true" : "seasontype=2";
+
+  const [info, schedule, moreSchedule, scoreboard] = await Promise.all([
+    getJSON(url),
+    getJSON(`${url}/schedule`),
+    getJSON(`${url}/schedule?${extra}`).catch(() => ({ events: [] })),
     fetchScoreboard(league),
   ]);
   const team = info.team;
 
-  // Collect every game we know about for this team, from all three sources.
+  // Collect every game from all the sources, without duplicates.
   // Later sources replace earlier ones, so the scoreboard (freshest) wins.
   const games = new Map();
   const add = game => games.set(game.id, game);
   schedule.events.map(toGame).forEach(add);
+  moreSchedule.events.map(toGame).forEach(add);
   (team.nextEvent ?? []).map(toGame).forEach(add);
   scoreboard
     .filter(g => g.home.id === teamId || g.away.id === teamId)
     .forEach(add);
 
-  const all = [...games.values()].sort((a, b) => a.date - b.date);
-
   return {
-    record: team.record?.items?.[0]?.summary ?? "",
-    standing: team.standingSummary ?? "",
-    live: all.find(g => g.state === "in") ?? null,
-    last: all.filter(g => g.state === "post").at(-1) ?? null,
-    next: all.find(g => g.state === "pre") ?? null,
+    team: {
+      id: team.id,
+      name: team.displayName,
+      abbr: team.abbreviation,
+      color: team.color ? `#${team.color}` : "#888888",
+      logo: team.logos?.[0]?.href ?? "",
+      record: team.record?.items?.[0]?.summary ?? "",
+      standing: team.standingSummary ?? "",
+    },
+    games: [...games.values()].sort((a, b) => a.date - b.date),
   };
+}
+
+// Everything the Home card needs for one team:
+// { record: "2-2", standing: "3rd in NFC North", live, last, next }
+// live / last / next are games (or null if there isn't one).
+export async function fetchTeamSummary(league, teamId) {
+  const { team, games } = await fetchTeamGames(league, teamId);
+  return {
+    record: team.record,
+    standing: team.standing,
+    live: games.find(g => g.state === "in") ?? null,
+    last: games.filter(g => g.state === "post").at(-1) ?? null,
+    next: games.find(g => g.state === "pre") ?? null,
+  };
+}
+
+// ---------- Standings ----------
+
+// A league's standings, ready to draw:
+// { season: "2026", groups: [{ name: "NFC North", rows: [{ team, stats }] }] }
+// stats is a lookup like { wins: "4", losses: "0", winpercent: "1.000", ... }
+export async function fetchStandings(league) {
+  const level = league.divisions ? "?level=3" : "";
+  const data = await getJSON(
+    `https://site.api.espn.com/apis/v2/sports/${league.path}/standings${level}`);
+
+  // Standings are nested (league > conference > division). Walk down the
+  // tree and collect every group that actually has teams in it.
+  const groups = [];
+  let season = "";
+  const walk = node => {
+    const entries = node.standings?.entries;
+    if (entries?.length) {
+      season ||= node.standings.seasonDisplayName ?? "";
+      groups.push({ name: node.name, rows: entries.map(toStandingRow) });
+    }
+    (node.children ?? []).forEach(walk);
+  };
+  walk(data);
+
+  for (const group of groups) group.rows.sort(standingsOrder(league.sortBy));
+  return { season, groups };
+}
+
+function toStandingRow(entry) {
+  const stats = {};
+  for (const stat of entry.stats) stats[stat.type] = stat.displayValue;
+  return {
+    team: {
+      id: entry.team.id,
+      name: entry.team.shortDisplayName ?? entry.team.displayName,
+      logo: entry.team.logos?.[0]?.href ?? "",
+    },
+    stats,
+  };
+}
+
+// Returns a "compare two rows" function for sorting
+function standingsOrder(sortBy) {
+  const num = (row, key) => parseFloat(row.stats[key]) || 0;
+  if (sortBy === "rank") {
+    return (a, b) => num(a, "rank") - num(b, "rank");
+  }
+  if (sortBy === "conference") {
+    // Best conference win % first; ties broken by overall wins
+    return (a, b) => num(b, "leaguewinpercent") - num(a, "leaguewinpercent")
+                  || num(b, "wins") - num(a, "wins");
+  }
+  // "seed": playoff seed 1 first (0 means no seed, so put those last)
+  return (a, b) => (num(a, "playoffseed") || 99) - (num(b, "playoffseed") || 99);
 }

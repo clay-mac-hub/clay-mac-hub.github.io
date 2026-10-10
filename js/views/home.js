@@ -32,8 +32,9 @@ export function homeScreen(screen) {
       <a class="button-link" href="#favorites">Edit</a>
     </div>
     <div class="stack">
-      ${favorites.map(team => `<div class="card team-card" id="card-${team.league}-${team.id}"
-            style="--team-color: ${team.color}">${cardContent(team)}</div>`).join("")}
+      ${favorites.map(team => `<div class="card team-card tappable" id="card-${team.league}-${team.id}"
+            style="--team-color: ${team.color}"
+            onclick="location.hash = '#team/${team.league}/${team.id}'">${cardContent(team)}</div>`).join("")}
     </div>
   `;
 

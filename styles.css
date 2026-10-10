@@ -264,6 +264,101 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Anything you can tap dims slightly while your finger is on it */
+.tappable, .standings tbody tr, .game-line { cursor: pointer; }
+.tappable:active, .standings tbody tr:active, .game-line:active { opacity: 0.6; }
+
+.back { font-size: 17px; }
+
+.fav-toggle {
+  border: none;
+  background: none;
+  font: inherit;
+  padding: 0;
+}
+
+.logo.tiny { width: 22px; height: 22px; }
+.logo.huge { width: 64px; height: 64px; }
+
+/* ---------- Standings tables ---------- */
+
+.standings { padding: 8px 12px; overflow-x: auto; }
+
+.standings table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.standings th {
+  padding: 6px 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.standings th.group-name {
+  text-align: left;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.standings td {
+  padding: 8px 4px;
+  text-align: right;
+  border-top: 0.5px solid var(--separator);
+}
+
+.standings td.pos { color: var(--text-dim); width: 20px; text-align: left; }
+
+.standings td.team-cell {
+  width: 100%;            /* team name takes the spare room... */
+  text-align: left;
+  white-space: nowrap;
+}
+.standings td:not(.pos):not(.team-cell) { min-width: 34px; }   /* ...numbers get even columns */
+.standings td.team-cell img { vertical-align: middle; margin-right: 6px; }
+
+/* Your favorite teams stand out in the table */
+.standings tr.fav td { font-weight: 700; }
+.fav-star { color: #ffcc00; font-size: 12px; }
+
+/* ---------- Team page lists ---------- */
+
+.section { margin-top: 24px; }
+
+.section-title {
+  margin: 0 0 8px 4px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.game-line { font-size: 15px; }
+.game-line .date { width: 72px; flex: none; font-size: 14px; }
+.game-line .opponent { white-space: nowrap; }
+.game-line .right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;          /* allowed to shrink... */
+  text-align: right;     /* ...and long "time · TV" text wraps onto a 2nd line */
+}
+
+/* Games beyond the first few stay hidden until "Show all" is tapped */
+.section:not(.expanded) .extra { display: none; }
+
+.show-all {
+  margin: 8px 0 0 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  padding: 0;
+}
+
 .result { font-weight: 700; }
 .result-W { color: var(--win); }
 .result-L { color: var(--live); }
