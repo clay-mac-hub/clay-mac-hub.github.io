@@ -53,10 +53,14 @@ function toGame(event) {
     const c = comp.competitors.find(x => x.homeAway === homeAway);
     // Scores come as "24" on scoreboards but { displayValue: "24" } on schedules
     const score = typeof c.score === "object" ? c.score?.displayValue : c.score;
+    // College teams have a ranking; 99 means "not in the Top 25"
+    const rank = c.curatedRank?.current;
     return {
       id: c.team.id,
       name: c.team.displayName,
+      shortName: c.team.shortDisplayName ?? c.team.displayName,
       abbr: c.team.abbreviation,
+      rank: rank && rank <= 25 ? rank : null,
       logo: c.team.logo ?? c.team.logos?.[0]?.href ?? "",
       score: score ?? null,
       winner: c.winner === true,
@@ -75,19 +79,31 @@ function toGame(event) {
   };
 }
 
-// Today's scoreboard for a league. Several favorite teams in the same league
-// share one download, and it's reused for 30 seconds.
+// A league's scoreboard: every game on one day (or, with no date, ESPN's
+// "current" games — today, or this week for football).
+// Downloads are reused for 30 seconds, so several screens or favorite teams
+// in the same league share one.
 const scoreboardCache = {};
 
-function fetchScoreboard(league) {
-  const cached = scoreboardCache[league.id];
+export function fetchScoreboard(league, date = null) {
+  const params = [];
+  if (date) params.push(`dates=${espnDate(date)}`);
+  if (league.scoreboardQuery) params.push(league.scoreboardQuery);
+  const url = `${BASE}/${league.path}/scoreboard?${params.join("&")}`;
+
+  const cached = scoreboardCache[url];
   if (cached && Date.now() - cached.time < 30_000) return cached.promise;
 
-  const promise = getJSON(`${BASE}/${league.path}/scoreboard`)
-    .then(data => data.events.map(toGame))
-    .catch(() => []);   // if the scoreboard fails, we just won't have live updates
-  scoreboardCache[league.id] = { time: Date.now(), promise };
+  const promise = getJSON(url).then(data => data.events.map(toGame));
+  promise.catch(() => delete scoreboardCache[url]);   // don't remember failures
+  scoreboardCache[url] = { time: Date.now(), promise };
   return promise;
+}
+
+// ESPN wants dates written like 20261011 (year, month, day)
+function espnDate(date) {
+  const two = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}`;
 }
 
 // One team's info plus all its games this season, oldest first:
@@ -104,7 +120,8 @@ export async function fetchTeamGames(league, teamId) {
     getJSON(url),
     getJSON(`${url}/schedule`),
     getJSON(`${url}/schedule?${extra}`).catch(() => ({ events: [] })),
-    fetchScoreboard(league),
+    // if the scoreboard fails, we just won't have the very latest live score
+    fetchScoreboard(league).catch(() => []),
   ]);
   const team = info.team;
 

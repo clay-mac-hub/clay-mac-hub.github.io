@@ -8,6 +8,12 @@
 //               "seed" (playoff position), "rank" (table position, soccer),
 //               "conference" (conference win %, college)
 //   columns   — [heading, ESPN stat name] pairs shown in the standings table
+//
+// Scores settings (college only):
+//   scoreboardQuery — extra settings for ESPN's scoreboard: every top-division
+//                     game, not just ESPN's default selection
+//   topGamesOnly    — on the Scores screen, show Top 25 and favorite teams'
+//                     games first and hide the rest behind "Show all"
 
 const RECORD = [["W", "wins"], ["L", "losses"], ["PCT", "winpercent"], ["GB", "gamesbehind"]];
 const COLLEGE = [["CONF", "vsconf"], ["OVR", "total"]];
@@ -26,9 +32,11 @@ export const LEAGUES = [
     divisions: true, sortBy: "seed",
     columns: [["GP", "gamesplayed"], ["W", "wins"], ["L", "losses"], ["OTL", "otlosses"], ["PTS", "points"]] },
   { id: "cfb", name: "College Football", path: "football/college-football", hasTeams: true,
-    divisions: false, sortBy: "conference", columns: COLLEGE },
+    divisions: false, sortBy: "conference", columns: COLLEGE,
+    scoreboardQuery: "groups=80&limit=300", topGamesOnly: true },
   { id: "cbb", name: "College Basketball", path: "basketball/mens-college-basketball", hasTeams: true,
-    divisions: false, sortBy: "conference", columns: COLLEGE },
+    divisions: false, sortBy: "conference", columns: COLLEGE,
+    scoreboardQuery: "groups=50&limit=400", topGamesOnly: true },
   { id: "epl", name: "Premier League", path: "soccer/eng.1", hasTeams: true,
     divisions: false, sortBy: "rank", columns: SOCCER },
   { id: "ucl", name: "Champions League", path: "soccer/uefa.champions", hasTeams: true,
