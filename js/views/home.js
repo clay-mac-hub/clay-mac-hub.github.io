@@ -47,7 +47,14 @@ export async function homeScreen(screen) {
     favorites.map(team => fetchTeamGames(getLeague(team.league), team.id)));
   if (!stillOn(here)) return;   // you moved to another screen while waiting
 
-  const html = dashboard(favorites, results);
+  let html;
+  try {
+    html = dashboard(favorites, results);
+  } catch (error) {
+    // Something unexpected in ESPN's data: say so instead of hanging on "Loading"
+    console.error(error);
+    html = null;
+  }
   // If every download failed (e.g. no signal), keep showing the old games
   if (html === null) {
     if (!lastDrawn) {

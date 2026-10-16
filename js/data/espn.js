@@ -92,7 +92,7 @@ export function fetchScoreboard(league, date = null) {
   if (date) params.push(`dates=${espnDate(date)}`);
   if (league.scoreboardQuery) params.push(league.scoreboardQuery);
   const url = `${BASE}/${league.path}/scoreboard?${params.join("&")}`;
-  return cachedJSON(url).then(data => data.events.map(toGame));
+  return cachedJSON(url).then(data => toGames(data.events));
 }
 
 // Like getJSON, but reuses an answer from the last 30 seconds
@@ -124,26 +124,37 @@ function espnDate(date) {
 // ESPN's plain schedule doesn't always cover everything (e.g. NBA preseason
 // only, or soccer past results only), so we also ask for the regular season
 // (or upcoming soccer fixtures) and combine the two.
+//
+// The team's details (record, standing, logo…) come from the schedule too.
+// (ESPN's separate team-info feed stopped allowing web pages to read it in
+// October 2026, so the app no longer uses it.)
 export async function fetchTeamGames(league, teamId) {
-  const url = `${BASE}/${league.path}/teams/${teamId}`;
+  const url = `${BASE}/${league.path}/teams/${teamId}/schedule`;
   const extra = league.path.startsWith("soccer") ? "fixture=true" : "seasontype=2";
 
-  const [info, schedule, moreSchedule, scoreboard] = await Promise.all([
-    getJSON(url),
-    getJSON(`${url}/schedule`),
-    getJSON(`${url}/schedule?${extra}`).catch(() => ({ events: [] })),
+  // Each download may fail on its own; we use whatever arrives
+  const [schedule, moreSchedule, scoreboard] = await Promise.all([
+    getJSON(url).catch(() => null),
+    getJSON(`${url}?${extra}`).catch(() => null),
     // if the scoreboard fails, we just won't have the very latest live score
     fetchScoreboard(league).catch(() => []),
   ]);
-  const team = info.team;
+  if (!schedule && !moreSchedule) throw new Error("Couldn't load this team's schedule");
+  const team = schedule?.team ?? moreSchedule.team;
+
+  // The plain schedule's record is for the current part of the season. If
+  // that's an empty "0-0" (e.g. a team not in the playoffs), use the
+  // regular-season record instead.
+  const isEmpty = record => !record || /^0(-0)+$/.test(record);
+  const record = [schedule?.team?.recordSummary, moreSchedule?.team?.recordSummary]
+    .find(r => !isEmpty(r)) ?? "";
 
   // Collect every game from all the sources, without duplicates.
   // Later sources replace earlier ones, so the scoreboard (freshest) wins.
   const games = new Map();
   const add = game => games.set(game.id, game);
-  schedule.events.map(toGame).forEach(add);
-  moreSchedule.events.map(toGame).forEach(add);
-  (team.nextEvent ?? []).map(toGame).forEach(add);
+  toGames(schedule?.events).forEach(add);
+  toGames(moreSchedule?.events).forEach(add);
   scoreboard
     .filter(g => g.home.id === teamId || g.away.id === teamId)
     .forEach(add);
@@ -154,26 +165,27 @@ export async function fetchTeamGames(league, teamId) {
       name: team.displayName,
       abbr: team.abbreviation,
       color: team.color ? `#${team.color}` : "#888888",
-      logo: team.logos?.[0]?.href ?? "",
-      record: team.record?.items?.[0]?.summary ?? "",
+      logo: team.logo ?? team.logos?.[0]?.href ?? "",
+      record,
       standing: team.standingSummary ?? "",
     },
     games: [...games.values()].sort((a, b) => a.date - b.date),
   };
 }
 
-// Everything the Home card needs for one team:
-// { record: "2-2", standing: "3rd in NFC North", live, last, next }
-// live / last / next are games (or null if there isn't one).
-export async function fetchTeamSummary(league, teamId) {
-  const { team, games } = await fetchTeamGames(league, teamId);
-  return {
-    record: team.record,
-    standing: team.standing,
-    live: games.find(g => g.state === "in") ?? null,
-    last: games.filter(g => g.state === "post").at(-1) ?? null,
-    next: games.find(g => g.state === "pre") ?? null,
-  };
+// Turn a list of ESPN events into games, skipping any ESPN describes in a
+// way we can't read (e.g. a playoff game whose opponent isn't decided yet),
+// so one odd game can't break a whole screen.
+function toGames(events) {
+  const games = [];
+  for (const event of events ?? []) {
+    try {
+      games.push(toGame(event));
+    } catch {
+      // skip this one game
+    }
+  }
+  return games;
 }
 
 // ---------- Golf ----------
