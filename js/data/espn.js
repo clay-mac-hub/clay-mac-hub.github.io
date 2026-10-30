@@ -228,6 +228,12 @@ export async function fetchGame(league, eventId) {
       teamId: e.team?.id ?? "",
     }));
 
+  // Volleyball: ESPN has no stats, so use the NCAA box score our GitHub job saved
+  if (league.id === "wvb") {
+    const vb = await fetchVolleyballFile(`games/${eventId}.json`);
+    if (vb) return { game, videos, events, ...volleyballGame(vb, game) };
+  }
+
   return {
     game,
     videos,
@@ -364,6 +370,7 @@ function soccerLineups(rosters) {
 //   season: { labels, descriptions, splits: [{ name, stats }] } }
 // splits are e.g. "Regular Season" and "Postseason" (soccer: one per competition)
 export async function fetchPlayer(league, athleteId) {
+  if (league.id === "wvb") return fetchVolleyballPlayer(athleteId);
   const url = `${WEB}/${league.path}/athletes/${athleteId}`;
   const [bio, overview] = await Promise.all([
     getJSON(url),
@@ -396,6 +403,7 @@ export async function fetchPlayer(league, athleteId) {
 // { season: "2026", categories: [{ name: "Passing", stats: [{ label, value }] }] }
 export async function fetchTeamStats(league, teamId) {
   if (league.path.startsWith("soccer")) return fetchSoccerTeamStats(league, teamId);
+  if (league.id === "wvb") return fetchVolleyballTeamStats(teamId);
   const data = await getJSON(`${BASE}/${league.path}/teams/${teamId}/statistics`);
   const categories = (data.results?.stats?.categories ?? [])
     .map(category => ({
@@ -488,6 +496,162 @@ function soccerValue(stat) {
     return `${Math.round((number <= 1 ? number * 100 : number) * 10) / 10}%`;
   }
   return stat.displayValue;
+}
+
+// ---------- Volleyball stats (from the NCAA, via our GitHub job) ----------
+// ESPN keeps no volleyball stats. A GitHub job (tools/update_volleyball.py)
+// collects NCAA box scores every 30 minutes and saves them on the
+// "volleyball-data" branch of this app's GitHub project. GitHub lets web
+// pages read those files directly.
+
+const VB_DATA = "https://raw.githubusercontent.com/clay-mac-hub/clay-mac-hub.github.io/volleyball-data";
+
+// One stored file, or null if there isn't one (e.g. a match the NCAA
+// doesn't cover, or one that hasn't been collected yet)
+async function fetchVolleyballFile(path) {
+  try {
+    return await getJSON(`${VB_DATA}/${path}`);
+  } catch {
+    return null;
+  }
+}
+
+// "12.0" -> "12", "2.5" -> "2.5"
+const vbNumber = n => String(Math.round(n * 10) / 10);
+// Hitting percentage, written the volleyball way: ".264"
+const vbPct = n => (n < 0 ? "-" : "") + Math.abs(n).toFixed(3).replace(/^0/, "");
+// Blocks count a solo block as 1 and a shared block as half
+const vbBlocks = s => s.blockSolos + s.blockAssists / 2;
+const vbHitting = s => s.attackAttempts ? (s.kills - s.attackErrors) / s.attackAttempts : 0;
+
+const VB_GAME_COLUMNS = [
+  ["K", "Kills", s => vbNumber(s.kills)],
+  ["E", "Attack errors", s => vbNumber(s.attackErrors)],
+  ["TA", "Total attacks", s => vbNumber(s.attackAttempts)],
+  ["PCT", "Hitting percentage", s => vbPct(vbHitting(s))],
+  ["A", "Assists", s => vbNumber(s.assists)],
+  ["SA", "Service aces", s => vbNumber(s.serviceAces)],
+  ["D", "Digs", s => vbNumber(s.digs)],
+  ["B", "Blocks", s => vbNumber(vbBlocks(s))],
+  ["PTS", "Points", s => vbNumber(s.points)],
+];
+
+function volleyballGame(vb, game) {
+  const away = vb.teams.find(t => t.espnTeamId === game.away.id) ?? vb.teams.find(t => !t.isHome);
+  const home = vb.teams.find(t => t.espnTeamId === game.home.id) ?? vb.teams.find(t => t.isHome);
+
+  const row = (label, value) => ({ label, away: value(away.totals), home: value(home.totals) });
+  const teamStats = away && home ? [
+    row("Kills", s => vbNumber(s.kills)),
+    row("Hitting %", s => vbPct(vbHitting(s))),
+    row("Attack errors", s => vbNumber(s.attackErrors)),
+    row("Total attacks", s => vbNumber(s.attackAttempts)),
+    row("Assists", s => vbNumber(s.assists)),
+    row("Service aces", s => vbNumber(s.serviceAces)),
+    row("Service errors", s => vbNumber(s.serviceErrors)),
+    row("Digs", s => vbNumber(s.digs)),
+    row("Blocks", s => vbNumber(vbBlocks(s))),
+    row("Reception errors", s => vbNumber(s.receptionErrors)),
+    row("Points", s => vbNumber(s.points)),
+  ] : [];
+
+  const teams = vb.teams.map(side => {
+    const espnTeam = side.espnTeamId === game.home.id ? game.home : side.espnTeamId === game.away.id ? game.away : null;
+    return {
+      team: { id: side.espnTeamId ?? "", name: espnTeam?.name ?? side.name, abbr: espnTeam?.abbr ?? "", logo: espnTeam?.logo ?? "" },
+      groups: [{
+        name: "Players",
+        labels: VB_GAME_COLUMNS.map(([label]) => label),
+        descriptions: VB_GAME_COLUMNS.map(([, description]) => description),
+        // Biggest contributors first
+        players: [...side.players].sort((a, b) => b.points - a.points || b.digs - a.digs).map(p => ({
+          // Volleyball player ids are "<ESPN team id>.<name>", e.g. "2509.grace-heaney"
+          id: `${side.espnTeamId}.${p.key}`,
+          name: p.name,
+          shortName: p.name,
+          headshot: "",
+          position: p.position,
+          jersey: p.number ?? "",
+          stats: VB_GAME_COLUMNS.map(([, , value]) => value(p)),
+          starter: p.starter,
+        })),
+      }],
+    };
+  }).filter(side => side.team.id);
+
+  return { teamStats, teams, hasStats: true };
+}
+
+const VB_SEASON_COLUMNS = [
+  ["MP", "Matches played", p => vbNumber(p.matches)],
+  ["S", "Sets played", p => vbNumber(p.sets)],
+  ["PTS", "Points", p => vbNumber(p.points)],
+  ["K", "Kills", p => vbNumber(p.kills)],
+  ["K/S", "Kills per set", p => p.sets ? (p.kills / p.sets).toFixed(2) : "0"],
+  ["PCT", "Hitting percentage", p => vbPct(vbHitting(p))],
+  ["E", "Attack errors", p => vbNumber(p.attackErrors)],
+  ["TA", "Total attacks", p => vbNumber(p.attackAttempts)],
+  ["A", "Assists", p => vbNumber(p.assists)],
+  ["SA", "Service aces", p => vbNumber(p.serviceAces)],
+  ["D", "Digs", p => vbNumber(p.digs)],
+  ["D/S", "Digs per set", p => p.sets ? (p.digs / p.sets).toFixed(2) : "0"],
+  ["B", "Blocks", p => vbNumber(vbBlocks(p))],
+];
+
+async function fetchVolleyballPlayer(athleteId) {
+  const [teamId, key] = athleteId.split(".");
+  const team = await fetchVolleyballFile(`teams/${teamId}.json`);
+  const player = team?.players.find(p => p.key === key);
+  if (!player) throw new Error("No stats saved for this player yet");
+  return {
+    name: player.name,
+    headshot: "",
+    position: player.position,
+    jersey: player.number ?? "",
+    height: "",
+    age: null,
+    team: { id: teamId, name: team.name },
+    season: {
+      labels: VB_SEASON_COLUMNS.map(([label]) => label),
+      descriptions: VB_SEASON_COLUMNS.map(([, description]) => description),
+      splits: [{ name: `${new Date().getFullYear()} Season`, stats: VB_SEASON_COLUMNS.map(([, , value]) => value(player)) }],
+    },
+  };
+}
+
+async function fetchVolleyballTeamStats(teamId) {
+  const team = await fetchVolleyballFile(`teams/${teamId}.json`);
+  if (!team) return { season: "", categories: [] };
+  const t = team.totals;
+  const perSet = value => team.sets ? (value / team.sets).toFixed(2) : "0";
+  const stat = (label, value) => ({ label, value });
+
+  // The player with the most of something, e.g. "Kills: Grace Heaney" — 40
+  const leader = (label, value) => {
+    const best = [...team.players].sort((a, b) => value(b) - value(a))[0];
+    return best && value(best) > 0 ? stat(`${label}: ${best.name}`, vbNumber(value(best))) : null;
+  };
+
+  return {
+    season: String(new Date().getFullYear()),
+    categories: [
+      { name: "Record", stats: [stat("Matches", team.matches), stat("Wins", team.wins),
+          stat("Losses", team.losses), stat("Sets played", vbNumber(team.sets))] },
+      { name: "Attacking", stats: [stat("Kills", vbNumber(t.kills)), stat("Kills per set", perSet(t.kills)),
+          stat("Hitting %", vbPct(team.hittingPct)), stat("Attack errors", vbNumber(t.attackErrors)),
+          stat("Total attacks", vbNumber(t.attackAttempts)), stat("Opponents' hitting %", vbPct(team.opponentHittingPct))] },
+      { name: "Setting and Serving", stats: [stat("Assists", vbNumber(t.assists)), stat("Assists per set", perSet(t.assists)),
+          stat("Service aces", vbNumber(t.serviceAces)), stat("Aces per set", perSet(t.serviceAces)),
+          stat("Service errors", vbNumber(t.serviceErrors))] },
+      { name: "Defense", stats: [stat("Digs", vbNumber(t.digs)), stat("Digs per set", perSet(t.digs)),
+          stat("Blocks", vbNumber(vbBlocks(t))), stat("Blocks per set", perSet(vbBlocks(t))),
+          stat("Reception errors", vbNumber(t.receptionErrors))] },
+      { name: "Team Leaders", stats: [
+          leader("Points", p => p.points), leader("Kills", p => p.kills), leader("Assists", p => p.assists),
+          leader("Digs", p => p.digs), leader("Aces", p => p.serviceAces), leader("Blocks", p => vbBlocks(p)),
+        ].filter(Boolean) },
+    ].filter(category => category.stats.length),
+  };
 }
 
 // ---------- Golf ----------

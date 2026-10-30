@@ -49,7 +49,7 @@ export async function gameScreen(screen, leagueId, eventId) {
   const reopenLists = rememberExpanded(screen);
   const rest = `
     ${goalsAndCards(details)}
-    ${teamStats(details)}
+    ${teamStats(details, league)}
     ${players(league, eventId, details)}`;
 
   if (refreshing && videoPlaying) {
@@ -155,11 +155,15 @@ function goalsAndCards({ events, game }) {
 // Before kickoff, ESPN fills this with a season comparison of the two
 // teams (streak, points per game…), so it gets a different title then.
 
-function teamStats({ teamStats: rows, game, hasStats }) {
+function teamStats({ teamStats: rows, game, hasStats }, league) {
   if (!rows.length) {
+    // Volleyball stats come from the NCAA, collected every 30 minutes
+    const noStats = league.id === "wvb"
+      ? "Stats for this match aren't available yet. They're collected from the NCAA every 30 minutes once a match starts (a few small schools aren't covered)."
+      : "ESPN doesn't keep stats for this sport.";
     const why = game.state === "pre"
       ? "Stats appear once the game starts."
-      : hasStats ? "" : "ESPN doesn't keep stats for this sport.";
+      : hasStats ? "" : noStats;
     return why ? `<div class="section"><div class="card dim small">${why}</div></div>` : "";
   }
 

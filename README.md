@@ -22,6 +22,17 @@ python3 -m http.server 8080
 
 Then open http://localhost:8080 in a browser. Stop it with Ctrl-C.
 
+## Volleyball stats (automatic)
+
+ESPN keeps no volleyball stats, so a GitHub job (`.github/workflows/volleyball.yml`)
+collects NCAA box scores every 30 minutes, August–December, using
+`tools/update_volleyball.py`, and saves them on the separate `volleyball-data`
+branch, which the app reads. To rebuild the whole season, open the project on
+GitHub → Actions → "Volleyball stats" → "Run workflow" and enter a start date.
+
+Note: GitHub pauses scheduled jobs in a project with no activity for 60 days.
+If volleyball stats stop updating, re-enable it under Actions.
+
 ## Occasional chores
 
 - **Update team lists** (new Premier League teams after promotion, new

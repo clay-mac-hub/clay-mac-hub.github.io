@@ -1,0 +1,64 @@
+# A GitHub job that collects NCAA women's volleyball stats for the app.
+#
+# Every 30 minutes during the season (August–December) it runs
+# tools/update_volleyball.py and saves the results on the separate
+# "volleyball-data" branch, which the app reads. Keeping the data on its own
+# branch means the app's own history isn't filled with automatic updates.
+#
+# To rebuild the whole season (e.g. after changing the script): on GitHub,
+# open Actions → "Volleyball stats" → "Run workflow", and enter a start date.
+
+name: Volleyball stats
+
+on:
+  schedule:
+    - cron: "*/30 * * 8-12 *"     # every 30 minutes, August through December
+  workflow_dispatch:               # lets you start it by hand from GitHub
+    inputs:
+      since:
+        description: "Rebuild from this date (YYYY-MM-DD). Leave blank for just the last 2 days."
+        required: false
+
+permissions:
+  contents: write                  # needed to save the data branch
+
+concurrency:
+  group: volleyball-stats          # never run two at once
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Get the app's code (for the script)
+        uses: actions/checkout@v4
+
+      - name: Get the saved volleyball data
+        uses: actions/checkout@v4
+        with:
+          ref: volleyball-data
+          path: data
+
+      - name: Collect new stats
+        env:
+          SINCE: ${{ github.event.inputs.since }}
+        run: |
+          if [ -n "$SINCE" ]; then
+            python3 tools/update_volleyball.py data --since "$SINCE"
+          else
+            python3 tools/update_volleyball.py data
+          fi
+
+      - name: Save the data (only if something changed)
+        working-directory: data
+        run: |
+          git config user.name "volleyball-stats-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -q -m "Update volleyball stats"
+            git push -q
+          fi
