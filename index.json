@@ -1,30 +1,6 @@
 {
- "updated": "2026-10-30T02:47:27+00:00",
+ "updated": "2026-10-30T02:47:59+00:00",
  "matches": 3721,
  "matchedToEspn": 3678,
- "unmatchedTeams": [
-  "Ark.-Monticello",
-  "Claflin",
-  "Col. of Charleston",
-  "Dillard",
-  "Erskine",
-  "Fla. Southern",
-  "Fort Valley St.",
-  "Henderson St.",
-  "Merrimack",
-  "Miles",
-  "Mississippi Val.",
-  "Missouri S&T",
-  "Old Dominion",
-  "Rutgers-Camden",
-  "Southeastern La.",
-  "Southern-N.O.",
-  "Southwest Minn. St.",
-  "Tampa",
-  "UC San Diego",
-  "UT Tyler",
-  "Vanderbilt",
-  "West Florida",
-  "Wheeling"
- ]
+ "unmatchedTeams": []
 }
