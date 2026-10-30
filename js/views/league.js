@@ -63,7 +63,7 @@ function standingsTable(league, group, focusTeamId) {
 
   const rows = group.rows.map((row, index) => {
     const cells = league.columns
-      .map(([, stat]) => `<td>${row.stats[stat] ?? "–"}</td>`).join("");
+      .map(([, stat]) => `<td>${tidy(row.stats[stat])}</td>`).join("");
     const fav = isFavorite(league.id, row.team.id);
     return `
       <tr class="${fav ? "fav" : ""} ${row.team.id === focusTeamId ? "focus" : ""}"
@@ -84,4 +84,11 @@ function standingsTable(league, group, focusTeamId) {
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+}
+
+// How a number appears in the table: "–" when missing, and percentages
+// written the sports way (".700", not "0.700")
+function tidy(value) {
+  if (value == null || value === "") return "–";
+  return /^0\.\d+$/.test(value) ? value.slice(1) : value;
 }

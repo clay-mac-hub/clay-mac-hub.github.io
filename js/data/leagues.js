@@ -39,6 +39,11 @@ export const LEAGUES = [
   { id: "cbb", name: "College Basketball", path: "basketball/mens-college-basketball", hasTeams: true,
     divisions: false, sortBy: "conference", columns: COLLEGE,
     scoreboardQuery: "groups=50&limit=400", topGamesOnly: true },
+  // ESPN has no volleyball conference records, only conference win %, and
+  // ranks teams within each conference by "seed"
+  { id: "wvb", name: "Women's Volleyball", path: "volleyball/womens-college-volleyball", hasTeams: true,
+    divisions: true, sortBy: "seed", columns: [["CONF %", "leaguewinpercent"], ["OVR", "total"]],
+    scoreboardQuery: "limit=400", topGamesOnly: true },
   { id: "epl", name: "Premier League", path: "soccer/eng.1", hasTeams: true,
     divisions: false, sortBy: "rank", columns: SOCCER },
   { id: "ucl", name: "Champions League", path: "soccer/uefa.champions", hasTeams: true,

@@ -24,6 +24,7 @@ LEAGUES = {
     "nhl": "hockey/nhl",
     "cfb": "football/college-football",
     "cbb": "basketball/mens-college-basketball",
+    "wvb": "volleyball/womens-college-volleyball",
     "epl": "soccer/eng.1",
     "ucl": "soccer/uefa.champions",
 }
