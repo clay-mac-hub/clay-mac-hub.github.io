@@ -395,6 +395,7 @@ export async function fetchPlayer(league, athleteId) {
 
 // { season: "2026", categories: [{ name: "Passing", stats: [{ label, value }] }] }
 export async function fetchTeamStats(league, teamId) {
+  if (league.path.startsWith("soccer")) return fetchSoccerTeamStats(league, teamId);
   const data = await getJSON(`${BASE}/${league.path}/teams/${teamId}/statistics`);
   const categories = (data.results?.stats?.categories ?? [])
     .map(category => ({
@@ -408,6 +409,85 @@ export async function fetchTeamStats(league, teamId) {
     season: data.season?.displayName ?? data.requestedSeason?.displayName ?? "",
     categories,
   };
+}
+
+// ---------- Soccer team season stats ----------
+// ESPN's usual team-stats feed is empty for soccer, but its "core" feed has
+// 100+ stats per team. We show the ones fans look at most first, hide a few
+// that are always blank, and tidy up percentages.
+
+const CORE = "https://sports.core.api.espn.com/v2/sports";
+
+// The stats to show first in each category, in order, with friendlier names
+const SOCCER_FEATURED = {
+  offensive: [["totalGoals", "Goals"], ["avgGoals", "Goals per game"],
+    ["avgExpectedGoals", "Expected goals per game"], ["totalShots", "Shots"],
+    ["shotsOnTarget", "Shots on target"], ["goalAssists", "Assists"],
+    ["possessionPct", "Possession"], ["bigChanceCreated", "Big chances created"]],
+  defensive: [["effectiveTackles", "Tackles won"], ["interceptions", "Interceptions"],
+    ["blockedShots", "Shots blocked"], ["totalClearance", "Clearances"], ["recoveries", "Ball recoveries"]],
+  goalKeeping: [["cleanSheet", "Clean sheets"], ["goalsConceded", "Goals conceded"],
+    ["avgGoalsConceded", "Goals conceded per game"], ["saves", "Saves"], ["shotsFaced", "Shots faced"]],
+  general: [["wins", "Wins"], ["losses", "Losses"], ["goalDifference", "Goal difference"],
+    ["passPct", "Pass accuracy"], ["wonCorners", "Corners won"], ["foulsCommitted", "Fouls"],
+    ["yellowCards", "Yellow cards"], ["redCards", "Red cards"]],
+};
+const SOCCER_CATEGORY_NAMES = {
+  offensive: "Attacking", defensive: "Defense", goalKeeping: "Goalkeeping", general: "General",
+};
+// Always blank or not meaningful for a whole team. ("draws" is wrong in
+// ESPN's feed — it says 0 even when a team has drawn — so it's left out;
+// the standings have the correct record.)
+const SOCCER_HIDDEN = /rating|^dnp$|^draws$|^minutes$|^starts$|^subIns$|^subOuts$|^suspensions$|shootOut|partialCleenSheet/i;
+
+// The league's current season, e.g. "2026" for 2026-27 (remembered once found)
+const soccerSeasons = {};
+async function soccerSeason(slug) {
+  if (!soccerSeasons[slug]) {
+    const data = await getJSON(`${CORE}/soccer/leagues/${slug}/seasons?limit=1`);
+    soccerSeasons[slug] = data.items[0].$ref.split("/seasons/")[1].split("?")[0];
+  }
+  return soccerSeasons[slug];
+}
+
+async function fetchSoccerTeamStats(league, teamId) {
+  const slug = league.path.split("/")[1];   // "soccer/eng.1" -> "eng.1"
+  const year = await soccerSeason(slug);
+  const data = await getJSON(
+    `${CORE}/soccer/leagues/${slug}/seasons/${year}/types/1/teams/${teamId}/statistics`);
+
+  const categories = (data.splits?.categories ?? []).map(category => {
+    const byName = {};
+    for (const stat of category.stats ?? []) byName[stat.name] = stat;
+    const featured = SOCCER_FEATURED[category.name] ?? [];
+    const featuredNames = featured.map(([name]) => name);
+
+    const shown = [
+      ...featured.filter(([name]) => byName[name])
+        .map(([name, label]) => ({ label, value: soccerValue(byName[name]) })),
+      ...(category.stats ?? [])
+        .filter(stat => !featuredNames.includes(stat.name) && !SOCCER_HIDDEN.test(stat.name))
+        .map(stat => ({ label: stat.displayName ?? stat.name, value: soccerValue(stat) })),
+    ];
+    return { name: SOCCER_CATEGORY_NAMES[category.name] ?? category.displayName, stats: shown };
+  }).filter(category => category.stats.length);
+
+  // Attacking first, then defense, goalkeeping, general
+  const order = ["Attacking", "Defense", "Goalkeeping", "General"];
+  categories.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+
+  const nextYear = String(Number(year) + 1).slice(2);
+  return { season: `${year}-${nextYear}`, categories };
+}
+
+// Percentages: ESPN mixes 0.8 (meaning 80%) and 53.3 (meaning 53.3%)
+function soccerValue(stat) {
+  if (/pct$/i.test(stat.name)) {
+    const number = Number(stat.value);
+    if (!Number.isFinite(number)) return stat.displayValue;
+    return `${Math.round((number <= 1 ? number * 100 : number) * 10) / 10}%`;
+  }
+  return stat.displayValue;
 }
 
 // ---------- Golf ----------
