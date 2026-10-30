@@ -15,6 +15,8 @@ import { leagueScreen } from "./views/league.js";
 import { teamScreen } from "./views/team.js";
 import { orderScreen } from "./views/order.js";
 import { golferScreen } from "./views/golfer.js";
+import { gameScreen } from "./views/game.js";
+import { playerScreen } from "./views/player.js";
 import { setTitle, setRefreshing, hideUpdated } from "./ui.js";
 import { clearScoreCache } from "./data/espn.js";
 import { autoRefreshOn } from "./store.js";
@@ -34,6 +36,8 @@ const screens = {
   team:      { title: "",               draw: teamScreen },
   order:     { title: "League Order",   draw: orderScreen },
   golfer:    { title: "",               draw: golferScreen, tab: "leagues" },
+  game:      { title: "",               draw: gameScreen },
+  player:    { title: "",               draw: playerScreen },
 };
 
 const TABS = ["home", "scores", "leagues", "settings"];

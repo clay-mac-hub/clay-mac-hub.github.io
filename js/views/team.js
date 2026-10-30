@@ -1,8 +1,10 @@
 // team.js — one team's page (e.g. "#team/nfl/8").
-// Record, a favorite star, any live game, upcoming games and past results.
+// Record, a favorite star, and a switch between two views:
+//   Schedule     — any live game, upcoming games and past results
+//   Season Stats — the team's stats for the year ("#team/nfl/8/stats")
 
 import { getLeague } from "../data/leagues.js";
-import { fetchTeamGames, smallLogo } from "../data/espn.js";
+import { fetchTeamGames, fetchTeamStats, smallLogo } from "../data/espn.js";
 import { isFavorite, toggleFavorite } from "../store.js";
 import { fromTeamView } from "../format.js";
 import { setTitle, backButton, stillOn, isRefreshing, markUpdated,
@@ -11,7 +13,7 @@ import { setTitle, backButton, stillOn, isRefreshing, markUpdated,
 // How many games to show in each list before "Show all"
 const SHORT_LIST = 5;
 
-export async function teamScreen(screen, leagueId, teamId) {
+export async function teamScreen(screen, leagueId, teamId, view = "schedule") {
   const league = getLeague(leagueId);
   if (!league || !teamId) { location.hash = "#leagues"; return; }
 
@@ -25,9 +27,14 @@ export async function teamScreen(screen, leagueId, teamId) {
       <div class="card dim">Loading team…</div>`;
   }
 
-  let data;
+  const showStats = view === "stats";
+  let data, stats = null;
   try {
-    data = await fetchTeamGames(league, teamId);
+    // Season stats are only downloaded when you're looking at them
+    [data, stats] = await Promise.all([
+      fetchTeamGames(league, teamId),
+      showStats ? fetchTeamStats(league, teamId).catch(() => null) : null,
+    ]);
   } catch {
     // A failed refresh keeps the old info; a failed first load shows a note
     if (stillOn(here) && !refreshing) {
@@ -67,9 +74,12 @@ export async function teamScreen(screen, leagueId, teamId) {
         ${league.name} Standings <span class="right">›</span></a>
     </div>
 
+    ${viewSwitch(league.id, team.id, showStats)}
+
     ${live.length ? section("Live", live, league.id, team.id) : ""}
-    ${section("Upcoming", upcoming, league.id, team.id, "No upcoming games scheduled")}
-    ${section("Results", results, league.id, team.id, "No results yet this season")}
+    ${showStats ? seasonStats(stats) : `
+      ${section("Upcoming", upcoming, league.id, team.id, "No upcoming games scheduled")}
+      ${section("Results", results, league.id, team.id, "No results yet this season")}`}
   `;
 
   // The ★ Favorite button at the top right
@@ -102,8 +112,41 @@ function section(title, games, leagueId, teamId, emptyText = "") {
     </div>`;
 }
 
+// The "Schedule | Season Stats" switch. It replaces the address rather than
+// adding to it, so "Back" still goes to wherever you were before this team.
+function viewSwitch(leagueId, teamId, showStats) {
+  const go = view => `location.replace('#team/${leagueId}/${teamId}${view}')`;
+  return `
+    <div class="segmented">
+      <button class="${showStats ? "" : "on"}" onclick="${go("")}">Schedule</button>
+      <button class="${showStats ? "on" : ""}" onclick="${go("/stats")}">Season Stats</button>
+    </div>`;
+}
+
+// Season stats: one section per category (e.g. Passing, Rushing), each
+// showing its first few stats with "Show all" for the rest
+const STATS_SHORT = 6;
+
+function seasonStats(stats) {
+  if (!stats || !stats.categories.length) {
+    return `<div class="section"><div class="card dim small">ESPN doesn't have season stats for this team yet.</div></div>`;
+  }
+  return stats.categories.map(category => `
+    <div class="section">
+      <h2 class="section-title">${category.name}
+        ${stats.season ? `<span class="dim small">${stats.season}</span>` : ""}</h2>
+      <ul class="list">
+        ${category.stats.map((stat, i) => `
+          <li class="${i >= STATS_SHORT ? "extra" : ""}">${stat.label}
+            <span class="right stat-number">${stat.value}</span></li>`).join("")}
+      </ul>
+      ${category.stats.length > STATS_SHORT
+        ? `<button class="button-link show-all">Show all ${category.stats.length}</button>` : ""}
+    </div>`).join("");
+}
+
 // One game: date on the left, opponent in the middle, result/time on the right.
-// Tapping it opens the opponent's team page.
+// Tapping it opens the game's details.
 function gameRow(game, leagueId, teamId, extraClass) {
   const { prefix, us, opponent } = fromTeamView(game, teamId);
 
@@ -131,7 +174,7 @@ function gameRow(game, leagueId, teamId, extraClass) {
   return `
     <li class="game-line ${extraClass}"
         ${game.state === "pre" ? `data-starts="${game.date.getTime()}"` : ""}
-        onclick="location.hash = '#team/${leagueId}/${opponent.id}'">
+        onclick="location.hash = '#game/${leagueId}/${game.id}'">
       <span class="dim date">${day}</span>
       <img class="logo tiny" src="${smallLogo(opponent.logo, 48)}" alt="" loading="lazy">
       <span class="opponent">${prefix} ${opponent.abbr}

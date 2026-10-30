@@ -188,6 +188,228 @@ function toGames(events) {
   return games;
 }
 
+// ---------- Game details ----------
+
+// Player and season stats live on a second ESPN address
+const WEB = "https://site.web.api.espn.com/apis/common/v3/sports";
+
+// Everything about one game:
+// { game,                      — the usual game shape (teams, score, status)
+//   videos:    [{ headline, thumb, duration, hls, mp4 }],
+//   events:    [{ minute, type, player, teamId }]   (soccer goals and cards)
+//   teamStats: [{ label, away, home }],
+//   teams:     [{ team: { id, name, abbr, logo }, groups: [
+//                 { name, labels, descriptions, players: [
+//                   { id, name, shortName, headshot, position, jersey, stats, starter }] }] }]
+//   hasStats }  — false when ESPN keeps no stats for the sport (e.g. volleyball)
+export async function fetchGame(league, eventId) {
+  const data = await cachedJSON(`${BASE}/${league.path}/summary?event=${eventId}`);
+  const comp = data.header.competitions[0];
+  const game = toGame({ id: data.header.id, date: comp.date, competitions: [comp] });
+
+  // Highlights. "hls" is a streaming version iPhones play natively: it adapts
+  // to your connection instead of downloading one huge file.
+  const videos = (data.videos ?? []).map(v => ({
+    headline: v.headline ?? "",
+    thumb: v.thumbnail ?? "",
+    duration: v.duration ?? 0,
+    hls: v.links?.source?.HLS?.href ?? "",
+    mp4: v.links?.mobile?.source?.href ?? v.links?.source?.href ?? "",
+  })).filter(v => v.hls || v.mp4);
+
+  // Soccer: goals and cards, in order
+  const SHOW = ["Goal", "Penalty - Scored", "Own Goal", "Yellow Card", "Red Card"];
+  const events = (data.keyEvents ?? [])
+    .filter(e => SHOW.some(type => (e.type?.text ?? "").startsWith(type)))
+    .map(e => ({
+      minute: e.clock?.displayValue ?? "",
+      type: e.type.text,
+      player: e.participants?.[0]?.athlete?.displayName ?? "",
+      teamId: e.team?.id ?? "",
+    }));
+
+  return {
+    game,
+    videos,
+    events,
+    teamStats: teamStatRows(data.boxscore?.teams ?? []),
+    // Soccer has lineups instead of a box score. (Baseball has lineup data
+    // too, but its box score is the better source, so only soccer uses it.)
+    teams: (league.path.startsWith("soccer") && data.rosters?.length
+      ? soccerLineups(data.rosters)
+      : boxScorePlayers(data.boxscore?.players ?? []))
+      .filter(side => side.groups.length),   // skip teams with nothing to show
+    hasStats: Boolean(data.boxscore?.teams?.some(t => t.statistics?.length) || data.rosters?.length),
+  };
+}
+
+// Team stats side by side: [{ label: "Rebounds", away: "41", home: "38" }]
+function teamStatRows(boxTeams) {
+  // Some sports (baseball) nest their stats in groups; flatten those
+  const flat = team => (team.statistics ?? []).flatMap(stat =>
+    stat.stats ? stat.stats.map(inner => ({ ...inner, group: stat.name })) : [stat]);
+  const away = boxTeams.find(t => t.homeAway === "away") ?? boxTeams[0];
+  const home = boxTeams.find(t => t.homeAway === "home") ?? boxTeams[1];
+  if (!away || !home) return [];
+
+  const homeStats = flat(home);
+  return flat(away)
+    .filter(stat => stat.displayValue != null)
+    .map(stat => {
+      const match = homeStats.find(h => h.name === stat.name && h.group === stat.group);
+      return {
+        label: stat.label ?? stat.displayName ?? stat.name,
+        away: stat.displayValue,
+        home: match?.displayValue ?? "–",
+      };
+    });
+}
+
+function playerInfo(athlete) {
+  return {
+    id: athlete.id,
+    name: athlete.displayName,
+    shortName: athlete.shortName ?? athlete.displayName,
+    headshot: athlete.headshot?.href ?? "",
+    position: athlete.position?.abbreviation ?? "",
+    jersey: athlete.jersey ?? "",
+  };
+}
+
+// Box score (most sports): each team's players in groups like "Passing"
+function boxScorePlayers(boxPlayers) {
+  return boxPlayers.map(side => ({
+    team: teamInfo(side.team),
+    groups: (side.statistics ?? [])
+      .map(group => ({
+        name: groupName(group),
+        labels: group.labels ?? [],
+        descriptions: group.descriptions ?? [],
+        players: (group.athletes ?? [])
+          .filter(a => a.stats?.length)   // skip players who didn't play
+          .map(a => ({ ...playerInfo(a.athlete), stats: a.stats, starter: a.starter === true })),
+      }))
+      .filter(group => group.players.length),
+  }));
+}
+
+// A heading for a group of players, e.g. "Passing", "Batting", "Goalies"
+const GROUP_NAMES = { defenses: "Defense", kickReturns: "Kick Returns", puntReturns: "Punt Returns" };
+
+function groupName(group) {
+  const raw = group.name ?? group.type ?? group.text;
+  if (raw) {
+    if (GROUP_NAMES[raw]) return GROUP_NAMES[raw];
+    // "kickReturns" -> "Kick Returns"
+    const words = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  const labels = group.labels ?? [];
+  if (labels.includes("IP")) return "Pitching";
+  if (labels.includes("AB")) return "Batting";
+  return "Players";
+}
+
+function teamInfo(team) {
+  return {
+    id: team.id,
+    name: team.displayName,
+    abbr: team.abbreviation,
+    logo: team.logo ?? team.logos?.[0]?.href ?? "",
+  };
+}
+
+// Soccer: starting XI and substitutes who came on, with their match stats
+const SOCCER_COLUMNS = [
+  ["G", "G", "Goals"], ["A", "A", "Assists"], ["SH", "SHOT", "Shots"],
+  ["SOG", "SOG", "Shots on goal"], ["FC", "FC", "Fouls committed"],
+  ["YC", "YC", "Yellow cards"], ["RC", "RC", "Red cards"],
+];
+
+function soccerLineups(rosters) {
+  return rosters.map(side => {
+    const toPlayer = a => {
+      const lookup = {};
+      for (const stat of a.stats ?? []) lookup[stat.abbreviation] = stat.displayValue;
+      return {
+        ...playerInfo(a.athlete),
+        position: a.position?.abbreviation === "SUB" ? "" : (a.position?.abbreviation ?? ""),
+        jersey: a.jersey ?? a.athlete.jersey ?? "",
+        stats: SOCCER_COLUMNS.map(([, key]) => lookup[key] ?? "0"),
+        starter: a.starter === true,
+      };
+    };
+    const group = (name, list) => ({
+      name,
+      labels: SOCCER_COLUMNS.map(([label]) => label),
+      descriptions: SOCCER_COLUMNS.map(([, , description]) => description),
+      players: list.map(toPlayer),
+    });
+    const roster = side.roster ?? [];
+    return {
+      team: teamInfo(side.team),
+      formation: side.formation ?? "",
+      groups: [
+        group("Starting XI", roster.filter(a => a.starter)),
+        group("Substitutes", roster.filter(a => !a.starter && a.subbedIn)),
+      ].filter(g => g.players.length),
+    };
+  });
+}
+
+// ---------- Players ----------
+
+// A player's profile and season stats:
+// { name, headshot, position, jersey, height, age, team: { id, name },
+//   season: { labels, descriptions, splits: [{ name, stats }] } }
+// splits are e.g. "Regular Season" and "Postseason" (soccer: one per competition)
+export async function fetchPlayer(league, athleteId) {
+  const url = `${WEB}/${league.path}/athletes/${athleteId}`;
+  const [bio, overview] = await Promise.all([
+    getJSON(url),
+    getJSON(`${url}/overview`).catch(() => null),   // some players have no stats yet
+  ]);
+  const a = bio.athlete;
+  const stats = overview?.statistics;
+
+  return {
+    name: a.displayName,
+    headshot: a.headshot?.href ?? "",
+    position: a.position?.displayName ?? a.position?.abbreviation ?? "",
+    jersey: a.jersey ?? "",
+    height: a.displayHeight ?? "",
+    age: a.age ?? null,
+    team: a.team ? { id: a.team.id, name: a.team.displayName } : null,
+    season: stats ? {
+      labels: stats.labels ?? [],
+      descriptions: stats.displayNames ?? [],
+      // "Projected" and "Career" aren't this year's real stats
+      splits: (stats.splits ?? [])
+        .filter(split => !/projected|career/i.test(split.displayName ?? ""))
+        .map(split => ({ name: split.displayName, stats: split.stats ?? [] })),
+    } : null,
+  };
+}
+
+// ---------- Team season stats ----------
+
+// { season: "2026", categories: [{ name: "Passing", stats: [{ label, value }] }] }
+export async function fetchTeamStats(league, teamId) {
+  const data = await getJSON(`${BASE}/${league.path}/teams/${teamId}/statistics`);
+  const categories = (data.results?.stats?.categories ?? [])
+    .map(category => ({
+      name: category.displayName ?? category.name,
+      stats: (category.stats ?? [])
+        .filter(stat => stat.displayValue != null)
+        .map(stat => ({ label: stat.displayName ?? stat.name, value: stat.displayValue })),
+    }))
+    .filter(category => category.stats.length);
+  return {
+    season: data.season?.displayName ?? data.requestedSeason?.displayName ?? "",
+    categories,
+  };
+}
+
 // ---------- Golf ----------
 
 // Golf scores are written relative to par: "-3", "+2" or "E" (even).

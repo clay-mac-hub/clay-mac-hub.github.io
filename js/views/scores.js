@@ -182,8 +182,7 @@ export function gameCard(league, game, isFav,
     const other = team === game.home ? game.away : game.home;
     const lost = finished && other.winner;
     return `
-      <div class="team-line ${lost ? "lost" : ""} ${isFav(league.id, team) ? "fav" : ""}"
-           onclick="location.hash = '#team/${league.id}/${team.id}'">
+      <div class="team-line ${lost ? "lost" : ""} ${isFav(league.id, team) ? "fav" : ""}">
         <img class="logo tiny" src="${smallLogo(team.logo, 48)}" alt="" loading="lazy">
         ${team.rank ? `<span class="rank">${team.rank}</span>` : ""}
         <span class="name">${team.shortName}</span>
@@ -218,9 +217,11 @@ export function gameCard(league, game, isFav,
     status = `<span>${result}<span class="dim">${game.detail}</span></span>${day}`;
   }
 
-  // data-starts tells auto-refresh when a not-yet-started game begins
+  // data-starts tells auto-refresh when a not-yet-started game begins.
+  // Tapping anywhere on the card opens the game's details.
   return `
-    <li class="score-card ${extraClass}"
+    <li class="score-card tappable ${extraClass}"
+        onclick="location.hash = '#game/${league.id}/${game.id}'"
         ${game.state === "pre" ? `data-starts="${game.date.getTime()}"` : ""}>
       <div class="teams">
         ${game.note ? `<div class="game-note">${game.note}</div>` : ""}
