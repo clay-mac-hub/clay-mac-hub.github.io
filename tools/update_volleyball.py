@@ -99,6 +99,8 @@ ALIASES = {
     "central connecticut state": "central connecticut",
     "ulm": "ul monroe",
     "uni": "northern iowa",
+    "col charleston": "charleston",
+    "mississippi val": "mississippi valley state",
 }
 
 
