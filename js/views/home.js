@@ -1,7 +1,8 @@
 // home.js — the "Dashboard" screen.
 // Only games involving your favorite teams, in three sections:
 //   Live     — being played right now
-//   Upcoming — starting in the next 7 days, soonest first
+//   Upcoming — each team's NEXT game only, if it's within the next 10 days,
+//              soonest first
 //   Results  — finished in the last 7 days, newest first
 
 import { getFavorites } from "../store.js";
@@ -10,7 +11,8 @@ import { fetchTeamGames } from "../data/espn.js";
 import { gameCard } from "./scores.js";
 import { markUpdated, stillOn, isRefreshing } from "../ui.js";
 
-const DAYS = 7;
+const RESULT_DAYS = 7;     // how far back Results goes
+const UPCOMING_DAYS = 10;  // how far ahead to look for each team's next game
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // The last Dashboard drawn, so coming back to it shows instantly while
@@ -83,25 +85,36 @@ function dashboard(favorites, results) {
   const isFav = (leagueId, team) =>
     favorites.some(f => f.league === leagueId && f.id === team.id);
 
-  // Collect the games in the 7-day window either side of now. When two of
-  // your teams play each other, the game appears once.
-  const games = new Map();
+  // Sort each team's games into the three sections. Games are stored by id,
+  // so when two of your teams play each other the game appears once.
+  const live = new Map(), upcoming = new Map(), finished = new Map();
   const failed = [];
   results.forEach((result, i) => {
     const team = favorites[i];
     if (result.status === "rejected") { failed.push(team.name); return; }
-    for (const game of result.value.games) {
-      const time = game.date.getTime();
-      if (time < now - DAYS * DAY_MS || time > now + DAYS * DAY_MS) continue;
-      games.set(`${team.league}-${game.id}`, { league: getLeague(team.league), game });
+    const league = getLeague(team.league);
+    const key = game => `${team.league}-${game.id}`;
+    const games = result.value.games;   // oldest first
+
+    for (const game of games) {
+      if (game.state === "in") live.set(key(game), { league, game });
+      if (game.state === "post" && game.date.getTime() >= now - RESULT_DAYS * DAY_MS) {
+        finished.set(key(game), { league, game });
+      }
+    }
+
+    // Only this team's next game, and only if it's within 10 days
+    const next = games.find(game => game.state === "pre");
+    if (next && next.date.getTime() <= now + UPCOMING_DAYS * DAY_MS) {
+      upcoming.set(key(next), { league, game: next });
     }
   });
   if (failed.length === favorites.length) return null;
 
-  const all = [...games.values()].sort((a, b) => a.game.date - b.game.date);
-  const live = all.filter(({ game }) => game.state === "in");
-  const upcoming = all.filter(({ game }) => game.state === "pre");
-  const finished = all.filter(({ game }) => game.state === "post").reverse();   // newest first
+  const byDate = map => [...map.values()].sort((a, b) => a.game.date - b.game.date);
+  const liveList = byDate(live);
+  const upcomingList = byDate(upcoming);
+  const finishedList = byDate(finished).reverse();   // newest first
 
   const cards = list => `<ul class="list">${list.map(({ league, game }) =>
     gameCard(league, game, isFav, { showLeague: true, showDate: true })).join("")}</ul>`;
@@ -115,9 +128,9 @@ function dashboard(favorites, results) {
   // Live only appears while something is on
   return `
     ${toolbar()}
-    ${live.length ? section("Live", live, "", true) : ""}
-    ${section("Upcoming", upcoming, "No games in the next 7 days.", !live.length)}
-    ${section("Results", finished, "No results in the last 7 days.")}
+    ${liveList.length ? section("Live", liveList, "", true) : ""}
+    ${section("Upcoming", upcomingList, "None of your teams play in the next 10 days.", !liveList.length)}
+    ${section("Results", finishedList, "No results in the last 7 days.")}
     ${failed.length
       ? `<p class="dim note">Couldn't load ${failed.join(", ")}. Pull down to try again.</p>`
       : ""}

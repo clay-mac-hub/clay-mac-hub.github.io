@@ -812,3 +812,11 @@ td.player-cell { display: table-cell; }
 }
 .segmented button.on { background: var(--accent); color: #fff; }
 .stat-number { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- Top 25 rankings ---------- */
+.rankings .move { font-size: 12px; font-weight: 700; }
+.rankings .move.up { color: var(--win); }
+.rankings .move.down { color: var(--live); }
+.rankings .move.new { color: var(--accent); }
+.rankings .team-cell .small { margin-left: 4px; }
+.standings-heading { margin: 24px 0 8px 4px; }

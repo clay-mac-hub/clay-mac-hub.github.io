@@ -799,6 +799,37 @@ export async function fetchScorecard(tour, eventId, playerId) {
   };
 }
 
+// ---------- Top 25 rankings (college) ----------
+
+// The main poll (AP Top 25 for football and basketball, AVCA for volleyball):
+// { name: "AP Top 25", week: "Week 9",
+//   ranks: [{ rank, change, team: { id, name, logo }, record, points, firstPlace }] }
+// change: how many places a team moved since last week (+2 = up two),
+// or "new" if it wasn't ranked last week.
+export async function fetchRankings(league) {
+  const data = await getJSON(`${BASE}/${league.path}/rankings`);
+  const poll = data.rankings?.[0];
+  if (!poll) return null;
+  // A preseason poll has no previous week, so there's no movement to show
+  const firstPoll = (poll.ranks ?? []).every(entry => !entry.previous);
+  return {
+    name: poll.name,
+    week: poll.occurrence?.displayValue ?? "",
+    ranks: (poll.ranks ?? []).map(entry => ({
+      rank: entry.current,
+      change: firstPoll ? 0 : !entry.previous ? "new" : entry.previous - entry.current,
+      team: {
+        id: entry.team.id,
+        name: entry.team.location ?? entry.team.name,
+        logo: entry.team.logo ?? entry.team.logos?.[0]?.href ?? "",
+      },
+      record: entry.recordSummary ?? "",
+      points: entry.points ?? null,
+      firstPlace: entry.firstPlaceVotes ?? 0,
+    })),
+  };
+}
+
 // ---------- Standings ----------
 
 // A league's standings, ready to draw:

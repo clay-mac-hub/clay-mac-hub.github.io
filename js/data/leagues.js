@@ -14,6 +14,7 @@
 //                     game, not just ESPN's default selection
 //   topGamesOnly    — on the Scores screen, show Top 25 and favorite teams'
 //                     games first and hide the rest behind "Show all"
+//   rankings        — the league page shows the Top 25 poll above the standings
 
 import { getLeagueOrder } from "../store.js";
 
@@ -35,15 +36,15 @@ export const LEAGUES = [
     columns: [["GP", "gamesplayed"], ["W", "wins"], ["L", "losses"], ["OTL", "otlosses"], ["PTS", "points"]] },
   { id: "cfb", name: "College Football", path: "football/college-football", hasTeams: true,
     divisions: false, sortBy: "conference", columns: COLLEGE,
-    scoreboardQuery: "groups=80&limit=300", topGamesOnly: true },
+    scoreboardQuery: "groups=80&limit=300", topGamesOnly: true, rankings: true },
   { id: "cbb", name: "College Basketball", path: "basketball/mens-college-basketball", hasTeams: true,
     divisions: false, sortBy: "conference", columns: COLLEGE,
-    scoreboardQuery: "groups=50&limit=400", topGamesOnly: true },
+    scoreboardQuery: "groups=50&limit=400", topGamesOnly: true, rankings: true },
   // ESPN has no volleyball conference records, only conference win %, and
   // ranks teams within each conference by "seed"
   { id: "wvb", name: "Women's Volleyball", path: "volleyball/womens-college-volleyball", hasTeams: true,
     divisions: true, sortBy: "seed", columns: [["CONF %", "leaguewinpercent"], ["OVR", "total"]],
-    scoreboardQuery: "limit=400", topGamesOnly: true },
+    scoreboardQuery: "limit=400", topGamesOnly: true, rankings: true },
   { id: "epl", name: "Premier League", path: "soccer/eng.1", hasTeams: true,
     divisions: false, sortBy: "rank", columns: SOCCER },
   { id: "ucl", name: "Champions League", path: "soccer/uefa.champions", hasTeams: true,
