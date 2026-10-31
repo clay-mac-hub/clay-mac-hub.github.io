@@ -1,10 +1,8 @@
 {
- "updated": "2026-10-31T01:44:21+00:00",
- "matches": 3841,
- "matchedToEspn": 3805,
+ "updated": "2026-10-31T02:31:48+00:00",
+ "matches": 3847,
+ "matchedToEspn": 3811,
  "unmatchedTeams": [
-  "Old Dominion",
-  "UC San Diego",
-  "Vanderbilt"
+  "UC San Diego"
  ]
 }
