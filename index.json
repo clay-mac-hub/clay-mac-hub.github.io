@@ -1,6 +1,10 @@
 {
- "updated": "2026-11-06T00:00:46+00:00",
- "matches": 4033,
- "matchedToEspn": 3997,
- "unmatchedTeams": []
+ "updated": "2026-11-06T01:39:33+00:00",
+ "matches": 4058,
+ "matchedToEspn": 4022,
+ "unmatchedTeams": [
+  "Lamar University",
+  "Southeastern La.",
+  "UC San Diego"
+ ]
 }
