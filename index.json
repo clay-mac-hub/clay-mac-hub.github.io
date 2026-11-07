@@ -1,12 +1,10 @@
 {
- "updated": "2026-11-07T19:59:19+00:00",
- "matches": 4231,
- "matchedToEspn": 4192,
+ "updated": "2026-11-07T20:27:30+00:00",
+ "matches": 4247,
+ "matchedToEspn": 4207,
  "unmatchedTeams": [
   "Delaware",
-  "Lamar University",
   "Merrimack",
-  "Missouri St.",
-  "Old Dominion"
+  "Missouri St."
  ]
 }
