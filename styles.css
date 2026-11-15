@@ -706,6 +706,14 @@ body {
 .video-card video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
 .video-title { padding: 10px 14px 12px; font-size: 15px; display: flex; gap: 8px; justify-content: space-between; }
 .section:not(.expanded) .video-card.extra { display: none; }
+.video-label { padding: 8px 14px; font-size: 13px; font-weight: 700; color: var(--accent);
+               text-transform: uppercase; letter-spacing: 0.5px; }
+.youtube-button {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 12px; padding: 13px 14px; border-radius: 14px;
+  background: #ff0000; color: #fff; font-size: 16px; font-weight: 600; text-decoration: none;
+}
+.youtube-button .play-icon { font-size: 13px; }
 
 /* Soccer goals and cards */
 .event-line { font-size: 15px; }

@@ -59,7 +59,7 @@ export async function gameScreen(screen, leagueId, eventId) {
     screen.innerHTML = `
       <div class="toolbar">${backButton("Back")}<span></span></div>
       ${scoreboard(league, game)}
-      <div id="highlights">${highlights(details.videos)}</div>
+      <div id="highlights">${highlights(details.videos, game)}</div>
       <div id="game-rest">${rest}</div>`;
   }
   reopenLists();
@@ -104,13 +104,18 @@ function scoreboard(league, game) {
 
 // ---------- Highlights ----------
 
-function highlights(videos) {
-  if (!videos.length) return "";
+// ESPN's videos (its whole-game recap first, when it has one), plus, once the
+// game is over, a button that searches YouTube for the full highlights the
+// leagues and TV networks post there.
+function highlights(videos, game) {
+  const finished = game.state === "post";
+  if (!videos.length && !finished) return "";
   const minutes = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
   // preload="none": nothing downloads until you press play (saves data)
   const cards = videos.map((video, i) => `
     <div class="video-card ${i >= 3 ? "extra" : ""}">
+      ${video.full ? `<div class="video-label">Full Game Highlights</div>` : ""}
       <video controls playsinline preload="none" poster="${video.thumb}">
         ${video.hls ? `<source src="${video.hls}" type="application/vnd.apple.mpegurl">` : ""}
         ${video.mp4 ? `<source src="${video.mp4}" type="video/mp4">` : ""}
@@ -122,9 +127,23 @@ function highlights(videos) {
   return `
     <div class="section">
       <h2 class="section-title">Highlights</h2>
-      <div class="stack">${cards}</div>
+      ${finished ? youtubeButton(game) : ""}
+      ${videos.length ? `<div class="stack">${cards}</div>` : ""}
       ${videos.length > 3 ? `<button class="button-link show-all">Show all ${videos.length} videos</button>` : ""}
     </div>`;
+}
+
+// Opens YouTube searched for this game, e.g.
+// "Philadelphia Eagles vs Dallas Cowboys highlights November 8, 2026".
+// (On iPhone this opens the YouTube app if you have it.)
+function youtubeButton(game) {
+  const day = game.date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const search = `${game.away.name} vs ${game.home.name} highlights ${day}`;
+  return `
+    <a class="youtube-button" target="_blank" rel="noopener"
+       href="https://www.youtube.com/results?search_query=${encodeURIComponent(search)}">
+      <span class="play-icon">▶</span> Watch full highlights on YouTube
+    </a>`;
 }
 
 // ---------- Soccer: goals and cards ----------

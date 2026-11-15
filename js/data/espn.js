@@ -195,7 +195,7 @@ const WEB = "https://site.web.api.espn.com/apis/common/v3/sports";
 
 // Everything about one game:
 // { game,                      — the usual game shape (teams, score, status)
-//   videos:    [{ headline, thumb, duration, hls, mp4 }],
+//   videos:    [{ headline, thumb, duration, hls, mp4, full }],  (full = whole-game recap)
 //   events:    [{ minute, type, player, teamId }]   (soccer goals and cards)
 //   teamStats: [{ label, away, home }],
 //   teams:     [{ team: { id, name, abbr, logo }, groups: [
@@ -215,7 +215,10 @@ export async function fetchGame(league, eventId) {
     duration: v.duration ?? 0,
     hls: v.links?.source?.HLS?.href ?? "",
     mp4: v.links?.mobile?.source?.href ?? v.links?.source?.href ?? "",
-  })).filter(v => v.hls || v.mp4);
+    // The whole-game recap ("Bulls vs. 76ers: Game Highlights") rather than one play
+    full: /\b(game|full) highlights\b|\brecap\b/i.test(v.headline ?? ""),
+  })).filter(v => v.hls || v.mp4)
+    .sort((a, b) => b.full - a.full);   // the recap goes first
 
   // Soccer: goals and cards, in order
   const SHOW = ["Goal", "Penalty - Scored", "Own Goal", "Yellow Card", "Red Card"];
